@@ -66,7 +66,10 @@ function chineseLog(value: unknown): string {
   if (Array.isArray(value)) return value.map(chineseLog).join('\n')
   if (value && typeof value === 'object')
     return Object.entries(value)
-      .map(([key, val]) => `${logWords[key] ?? key}：${chineseLog(val)}`)
+      .filter(([key, val]) => !(key === 'errors' && Array.isArray(val) && !val.length))
+      .map(([key, val]) => key === 'window' && typeof val === 'string'
+        ? `汇总时段：${new Date(val).toLocaleString()} ～ ${new Date(new Date(val).getTime() + 5 * 60 * 1000).toLocaleTimeString()}`
+        : `${logWords[key] ?? key}：${chineseLog(val)}`)
       .join('；')
   return String(value ?? '无')
 }

@@ -1,6 +1,6 @@
 import io,json,hashlib,os
 from contextlib import asynccontextmanager
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
 from pathlib import Path
 import pandas as pd
 from fastapi import FastAPI,HTTPException,UploadFile,File
@@ -229,7 +229,19 @@ def logs(bid:int):
  with session_scope() as db:return [service.serialize(l) for l in db.query(TaskLog).filter_by(batch_id=bid).order_by(TaskLog.id.desc()).limit(300)]
 @app.get('/api/sync/history')
 def sync_history():
- with session_scope() as db:return [service.serialize(b) for b in db.query(Batch).filter(Batch.kind=='sync').order_by(Batch.id.desc()).limit(100)]
+ with session_scope() as db:
+  rows=[];now=datetime.now(timezone.utc)
+  for b in db.query(Batch).filter(Batch.kind=='sync').order_by(Batch.id.desc()).limit(101):
+   try:summary=json.loads(b.message or '{}')
+   except ValueError:summary={}
+   window=summary.get('window')
+   if window:
+    end=datetime.fromisoformat(window)+timedelta(minutes=5)
+    if now<end:continue
+    row=service.serialize(b);row['create_time']=end;rows.append(row)
+   else:rows.append(service.serialize(b))
+   if len(rows)>=100:break
+  return rows
 @app.get('/api/runtime-logs')
 def runtime_logs():
  from app.utils.log import read_console_logs
