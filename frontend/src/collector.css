@@ -553,3 +553,6 @@ main, .panel, .table-wrap {min-width:0}
   .list-row > div {flex-basis:100%}
   pre,.sync-card {overflow-wrap:anywhere;max-width:100%}
 }
+
+.retry-actions {white-space:nowrap}.retry-actions .record-link {margin-right:12px;color:#527c78;text-decoration:none}.retry-actions button {padding:6px 10px;font-size:12px}
+@media(max-width:640px){.retry-actions {display:flex!important;align-items:center;gap:10px;flex-wrap:wrap}.retry-actions[data-label]::before{content:none}.retry-actions .record-link {margin-right:0}}

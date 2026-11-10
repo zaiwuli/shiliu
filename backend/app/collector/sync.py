@@ -28,14 +28,19 @@ def process(filters=None,reserved=False,operation=None,wait=False):
    with progress_lock:progress['running']=False
   return {'busy':True}
  history_id=None
+ realtime=wait and not operation
+ window=datetime.now(timezone.utc).replace(second=0,microsecond=0)
+ window=window.replace(minute=(window.minute//5)*5)
  stats={'inserted':0,'existing':0,'skipped':0,'failed':0,'conflict':0}
+ with progress_lock:progress.update(running=True,processed=0,total=0,stats=dict(stats),error=None)
  try:
   with session_scope() as db:
    ids=[item[0] for item in filtered(db,filters or {}).with_entities(Article.id).order_by(Article.id).all()]
   with progress_lock:progress.update(running=True,processed=0,total=len(ids),stats=dict(stats),error=None)
-  with session_scope() as db:
-   history=Batch(kind='sync',status='running',message=json.dumps({'operation':operation or ('实时同步' if wait else '手动或定时同步'),'total':len(ids)},ensure_ascii=False));db.add(history);db.flush();history_id=history.id
-  logger.info(f'开始转换同步，共 {len(ids)} 条文章')
+  if not realtime:
+   with session_scope() as db:
+    history=Batch(kind='sync',status='running',message=json.dumps({'operation':operation or ('实时同步' if wait else '手动或定时同步'),'total':len(ids)},ensure_ascii=False));db.add(history);db.flush();history_id=history.id
+  (logger.debug if realtime else logger.info)(f'开始转换同步，共 {len(ids)} 条文章')
   for offset in range(0,len(ids),500):
    with session_scope() as db:
     for a in db.query(Article).filter(Article.id.in_(ids[offset:offset+500])).order_by(Article.id).all():
@@ -70,7 +75,7 @@ def process(filters=None,reserved=False,operation=None,wait=False):
       if not row:row=Converted(article_id=a.id);db.add(row)
       row.status='failed';row.error=str(e);a.merge_status='failed';a.error=str(e);stats['failed']+=1
    with progress_lock:progress.update(processed=min(offset+500,len(ids)),stats=dict(stats))
-   logger.info(f'同步进度 {min(offset+500,len(ids))}/{len(ids)}：新增 {stats["inserted"]}，已存在 {stats["existing"]}，跳过 {stats["skipped"]}，失败 {stats["failed"]}，冲突 {stats["conflict"]}')
+   (logger.debug if realtime else logger.info)(f'同步进度 {min(offset+500,len(ids))}/{len(ids)}：新增 {stats["inserted"]}，已存在 {stats["existing"]}，跳过 {stats["skipped"]}，失败 {stats["failed"]}，冲突 {stats["conflict"]}')
   return stats
  except Exception as e:
   with progress_lock:progress['error']=str(e)
@@ -78,6 +83,23 @@ def process(filters=None,reserved=False,operation=None,wait=False):
   raise
  finally:
   try:
+   if realtime and (progress.get('total') or progress.get('error')):
+    with session_scope() as db:
+     key=window.isoformat()
+     # One persisted aggregate per five-minute window, updated after every realtime run.
+     candidates=db.query(Batch).filter(Batch.kind=='sync',Batch.create_time>=window).order_by(Batch.id.desc()).all()
+     history=None;summary=None
+     for candidate in candidates:
+      try:previous=json.loads(candidate.message or '{}')
+      except ValueError:continue
+      if previous.get('window')==key:history=candidate;summary=previous;break
+     if history is None:
+      history=Batch(kind='sync',status='completed');db.add(history)
+      summary={'operation':'实时同步（5分钟汇总）','window':key,'total':0,'runs':0,'stats':{},'errors':[]}
+     summary['total']+=progress.get('total',0);summary['runs']+=1
+     for name,value in stats.items():summary['stats'][name]=summary['stats'].get(name,0)+value
+     if progress.get('error'):summary['errors']=(summary['errors']+[progress['error']])[-20:]
+     history.status='failed' if summary['errors'] else 'completed';history.finished_at=datetime.now(timezone.utc);history.message=json.dumps(summary,ensure_ascii=False)
    if history_id:
     with session_scope() as db:
      history=db.get(Batch,history_id);history.status='failed' if progress.get('error') else 'completed';history.finished_at=datetime.now(timezone.utc)

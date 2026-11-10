@@ -31,7 +31,10 @@ def filtered(db,filters):
  q=db.query(Article)
  for key in ['website','section','source','batch_id','merge_status']:
   if filters.get(key) not in [None,'']:q=q.filter(getattr(Article,key)==filters[key])
- if filters.get('keyword'):q=q.filter(Article.title.ilike('%'+filters['keyword']+'%'))
+ if filters.get('keyword'):
+  keyword=filters['keyword'].strip();tid=keyword.lstrip('#')
+  if tid.isascii() and tid.isdigit() and len(tid)<=18:q=q.filter(Article.tid==int(tid))
+  else:q=q.filter(Article.title.ilike('%'+keyword+'%'))
  if filters.get('ids'):q=q.filter(Article.id.in_(filters['ids']))
  if filters.get('keep_section'):q=q.filter(Article.section!=filters['keep_section'])
  return q

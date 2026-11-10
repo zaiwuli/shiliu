@@ -49,6 +49,11 @@ const logWords: Record<string, string> = {
   message: '说明',
   realtime: '实时同步',
   scheduled: '定时同步',
+  operation: '操作',
+  total: '文章数',
+  stats: '统计',
+  runs: '同步次数',
+  window: '汇总时段起点',
 }
 function chineseLog(value: unknown): string {
   if (typeof value === 'string') {
@@ -162,6 +167,7 @@ function App() {
     [boards, setBoards] = useState<string[]>(['95', '142']),
     [start, setStart] = useState(1),
     [end, setEnd] = useState(''),
+    [emptyPages, setEmptyPages] = useState(3),
     [cron, setCron] = useState(''),
     [enabled, setEnabled] = useState(false),
     [network, setNetwork] = useState({
@@ -247,6 +253,7 @@ function App() {
     section_id_list: boards,
     start_page: start,
     max_page: end ? Number(end) : null,
+    stop_after_empty_pages: emptyPages,
     cron: cron || null,
     enabled,
   })
@@ -423,7 +430,7 @@ function App() {
               </div>
               <div className="toolbar">
                 <input
-                  placeholder="搜索标题"
+                  placeholder="搜索标题或原帖 ID，如 #3898266"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                 />
@@ -575,7 +582,7 @@ function App() {
           {retryStatus!=='running'&&<div className="toolbar"><label><input type="checkbox" checked={retryAll} onChange={e=>{setRetryAll(e.target.checked);setRetrySelected([])}}/>选择筛选全部（{retryTotal}）</label>
           {['waiting','manual'].includes(retryStatus)&&<button onClick={()=>retryAction('run')}>手动补抓</button>}
           <button onClick={()=>retryAction('restart')}>重新开启自动补抓</button><button onClick={()=>retryAction('ignore')}>忽略</button><button className="danger" onClick={()=>retryAction('delete')}>删除记录</button></div>}
-          <table className="retry-table"><thead><tr><th></th><th>帖子 / 板块</th><th>自动 / 手动次数</th><th>最近原因</th><th>下次执行</th></tr></thead><tbody>{retryRows.map(r=><tr key={r.id}><td><input type="checkbox" disabled={r.status==='running'||retryAll} checked={retryAll||retrySelected.includes(r.id)} onChange={e=>setRetrySelected(e.target.checked?[...retrySelected,r.id]:retrySelected.filter(i=>i!==r.id))}/></td><td><a href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">{r.tid}</a><p>{r.section}</p>{r.status==='recovered'&&<button onClick={()=>api(`/retries/${r.id}/links`).then(setRetryLinks).catch(e=>setError(e.message))}>查看链接</button>}</td><td data-label="自动 / 手动次数">{r.auto_attempts} / {r.manual_attempts}</td><td data-label="最近原因">{r.error||'—'}</td><td data-label="下次执行">{r.next_run?new Date(r.next_run).toLocaleString():'—'}</td></tr>)}</tbody></table>
+          <table className="retry-table"><thead><tr><th></th><th>帖子 / 板块</th><th>自动 / 手动次数</th><th>最近原因</th><th>下次执行</th><th>操作</th></tr></thead><tbody>{retryRows.map(r=><tr key={r.id}><td><input type="checkbox" disabled={r.status==='running'||retryAll} checked={retryAll||retrySelected.includes(r.id)} onChange={e=>setRetrySelected(e.target.checked?[...retrySelected,r.id]:retrySelected.filter(i=>i!==r.id))}/></td><td><a href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">{r.tid}</a><p>{r.section}</p></td><td data-label="自动 / 手动次数">{r.auto_attempts} / {r.manual_attempts}</td><td data-label="最近原因">{r.error||'—'}</td><td data-label="下次执行">{r.next_run?new Date(r.next_run).toLocaleString():'—'}</td><td className="retry-actions" data-label="操作"><a className="record-link" href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">原帖 ↗</a>{r.status==='recovered'&&<button onClick={()=>api(`/retries/${r.id}/links`).then(setRetryLinks).catch(e=>setError(e.message))}>核对链接</button>}</td></tr>)}</tbody></table>
           {!retryRows.length&&<p>暂无记录</p>}<div className="toolbar"><span>共 {retryTotal} 条 · 第 {retryPage} 页</span><button disabled={retryPage<=1} onClick={()=>{setRetryPage(retryPage-1);setRetrySelected([])}}>上一页</button><button disabled={retryPage*50>=retryTotal} onClick={()=>{setRetryPage(retryPage+1);setRetrySelected([])}}>下一页</button></div>
         </section>}
         {page === '采集任务' && (
@@ -584,9 +591,7 @@ function App() {
               <section className="panel">
                 <h2>色花堂采集</h2>
                 <p>
-                  不填写结束页：智能增量模式，到达同板块历史 TID
-                  范围后停止（最多 100
-                  页）；填写结束页：按指定页范围抓取。两种模式都跳过已存在帖子。
+                  不填写结束页：连续指定页数未发现缺失帖子后停止，最多扫描 100 页。填写结束页：按指定范围扫描。已存在或已忽略的帖子会跳过。
                 </p>
                 <label>
                   任务名称
@@ -631,6 +636,10 @@ function App() {
                       value={end}
                       onChange={(e) => setEnd(e.target.value)}
                     />
+                  </label>
+                  <label>
+                    连续无缺失页数（智能模式）
+                    <input type="number" min="1" max="100" disabled={!!end} value={emptyPages} onChange={(e) => setEmptyPages(Number(e.target.value))} />
                   </label>
                   <label>
                     定时 Cron（可选）
@@ -700,6 +709,7 @@ function App() {
                         setName(t.name)
                         setBoards((t.params.section_id_list as string[]) || [])
                         setStart(Number(t.params.start_page) || 1)
+                        setEmptyPages(Number(t.params.stop_after_empty_pages) || 3)
                         setEnd(
                           t.params.max_page ? String(t.params.max_page) : '',
                         )

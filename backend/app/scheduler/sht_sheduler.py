@@ -30,7 +30,7 @@ section_map = {
 sht_section_list = [{"label": v, "value": k} for k, v in section_map.items()]
 
 
-def sync_sht(max_page=None, section_id_list=None, start_page=None):
+def sync_sht(max_page=None, section_id_list=None, start_page=None, stop_after_empty_pages=3):
     sht.mode = 'direct'
     result = []
     logger.info(f'初始化色花堂抓取会话 | max_page={max_page}, section_count={len(section_id_list or section_map)}')
@@ -41,13 +41,13 @@ def sync_sht(max_page=None, section_id_list=None, start_page=None):
             section = section_map[section_id]
             success_count, page, fail_list = sync_article_common('sehuatang', section_id, section_map, sht.crawler_tid_list,
                                                                  sht.crawler_detail, start_page or 1, max_page or 100,
-                                                                 False if max_page else True)
-            logger.info(f'色花堂板块抓取完成 | section_id={section_id}, section={section}, success_count={success_count}, page={page - 1}, fail_count={len(fail_list)}')
+                                                                 False if max_page else True, stop_after_empty_pages)
+            logger.info(f'色花堂板块抓取完成 | section_id={section_id}, section={section}, success_count={success_count}, page={page}, fail_count={len(fail_list)}')
             result.append(
                 {
                     "section": section,
                     "success_count": success_count,
-                    "page": page - 1,
+                    "page": page,
                     "fail_list": fail_list,
                 }
             )

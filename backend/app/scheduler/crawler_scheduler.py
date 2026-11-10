@@ -1,7 +1,7 @@
 import random
 import time
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import config_manager
@@ -24,7 +24,8 @@ def sync_article_common(
         get_detail_func,
         start_page=1,
         max_page=100,
-        use_stop_threshold=True
+        use_stop_threshold=True,
+        stop_after_empty_pages=3
 ):
     section_id = str(section_id)
     max_page = int(max_page)
@@ -34,16 +35,9 @@ def sync_article_common(
     fail_id_list = []
     page = start_page
     success_count = 0
-    stop_tid = 0
-    if use_stop_threshold:
-        with session_scope() as session:
-            stop_tid = (
-                    session.query(func.max(Article.tid))
-                    .filter(Article.section == section)
-                    .filter(Article.website == site_name)
-                    .scalar() or 0
-            )
-        logger.info(f"[{site_name}][{section}] 数据库最大TID: {stop_tid}")
+    empty_pages = 0
+    stop_after_empty_pages = max(1, int(stop_after_empty_pages))
+    last_page = start_page - 1
 
     while page <= max_page:
         check_stop()
@@ -74,6 +68,7 @@ def sync_article_common(
             )
             break
 
+        last_page = page
         min_tid = min(tid_list)
         logger.info(f"[{site_name}][{section}] 当前页最小TID: {min_tid}")
 
@@ -123,16 +118,17 @@ def sync_article_common(
             success_count += len(articles)
 
         # 终止条件
-        if use_stop_threshold and min_tid <= stop_tid:
-            logger.info(
-                f"[{site_name}][{section}] 到达历史最大TID，任务结束"
-            )
-            break
+        empty_pages = 0 if un_existing_ids else empty_pages + 1
+        if use_stop_threshold:
+            logger.info(f"[{site_name}][{section}] 连续未发现缺失帖子页数：{empty_pages}/{stop_after_empty_pages}")
+            if empty_pages >= stop_after_empty_pages:
+                logger.info(f"[{site_name}][{section}] 连续 {empty_pages} 页未发现缺失帖子，结束采集")
+                break
 
         page += 1
 
     retry_fail_id_list = retry_fail(site_name, section_id, section_map, get_detail_func, fail_id_list)
-    return success_count, page, retry_fail_id_list
+    return success_count, last_page, retry_fail_id_list
 
 
 def retry_fail(

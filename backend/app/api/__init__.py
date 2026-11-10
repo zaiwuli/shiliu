@@ -89,11 +89,11 @@ def retry_action(body:RetryAction):
 class Filters(BaseModel):
  website:str|None=None;section:str|None=None;source:str|None=None;batch_id:int|None=None;merge_status:str|None=None;keyword:str|None=None;ids:list[int]|None=None;sections:list[str]|None=None;keep_section:str|None=None;min_tid:int|None=None;max_tid:int|None=None
 class Plan(BaseModel):
- name:str=Field(min_length=1);section_id_list:list[str]=Field(min_length=1);start_page:int=Field(default=1,ge=1);max_page:int|None=Field(default=None,ge=1);cron:str|None=None;enabled:bool=False
+ name:str=Field(min_length=1);section_id_list:list[str]=Field(min_length=1);start_page:int=Field(default=1,ge=1);max_page:int|None=Field(default=None,ge=1);stop_after_empty_pages:int=Field(default=3,ge=1,le=100);cron:str|None=None;enabled:bool=False
  def params(self):
   if any(x not in section_map for x in self.section_id_list):raise HTTPException(422,'未知板块')
   if self.max_page and self.max_page<self.start_page:raise HTTPException(422,'结束页不能小于起始页')
-  return self.model_dump(include={'section_id_list','start_page','max_page'})
+  return self.model_dump(include={'section_id_list','start_page','max_page','stop_after_empty_pages'})
 @app.get('/api/overview')
 def overview():
  with session_scope() as db:
