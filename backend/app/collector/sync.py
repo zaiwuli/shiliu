@@ -110,3 +110,5 @@ def process(filters=None,reserved=False,operation=None,wait=False):
   lock.release()
 def tick():
  if settings()['mode']=='realtime':return process()
+def fallback():
+ return process({'merge_status':'pending'},operation='兜底同步')

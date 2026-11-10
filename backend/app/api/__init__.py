@@ -22,7 +22,7 @@ def schedule():
  from app.collector.retry import tick
  scheduler.add_job(tick,'interval',seconds=60,id='retry-worker',max_instances=1)
  cfg=sync.settings()
- scheduler.add_job(sync.process,"interval",minutes=cfg["fallback_minutes"],id="sync-fallback",max_instances=1)
+ scheduler.add_job(sync.fallback,"interval",minutes=cfg["fallback_minutes"],id="sync-fallback",max_instances=1)
  if cfg["mode"]=="scheduled":scheduler.add_job(sync.process,CronTrigger.from_crontab(cfg["cron"]),id="sync-scheduled",max_instances=1)
  with session_scope() as db:
   for t in db.query(Task).filter(Task.enabled==True).all():
