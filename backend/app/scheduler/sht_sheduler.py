@@ -48,7 +48,7 @@ def sync_sht(max_page=None, section_id_list=None, start_page=None, stop_after_em
                     "section": section,
                     "success_count": success_count,
                     "page": page,
-                    "fail_list": fail_list,
+                    "fail_count": len(fail_list),
                 }
             )
     finally:

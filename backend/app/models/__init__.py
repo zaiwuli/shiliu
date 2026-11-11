@@ -28,5 +28,6 @@ class Converted(Base):
 
 class Retry(Base):
  __tablename__='shiliu_retry'
+ source_batch_id=Column(BigInteger)
  id=Column(BigInteger,primary_key=True);website=Column(String(32),nullable=False);tid=Column(BigInteger,nullable=False);section=Column(Text,nullable=False);status=Column(String(24),default='waiting',index=True);resume_status=Column(String(24),default='waiting');auto_attempts=Column(Integer,default=0);manual_attempts=Column(Integer,default=0);error=Column(Text);next_run=Column(DateTime(timezone=True),index=True);updated_at=Column(DateTime(timezone=True),server_default=func.now(),onupdate=func.now())
  __table_args__=(UniqueConstraint('website','tid',name='shiliu_retry_source_unique'),)

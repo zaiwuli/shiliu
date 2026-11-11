@@ -33,6 +33,7 @@ def sync_article_common(
     section = section_map[section_id]
 
     fail_id_list = []
+    seen_tids = set()
     page = start_page
     success_count = 0
     empty_pages = 0
@@ -82,15 +83,13 @@ def sync_article_common(
                 ).scalars().all()
             )
         with session_scope() as session:
-            ignored_tids={r[0] for r in session.query(Retry.tid).filter(Retry.website==site_name,Retry.status=='ignored',Retry.tid.in_(tid_list)).all()}
-        existing_article_tids |= ignored_tids
-        un_existing_ids = list(set(tid_list) - existing_article_tids)
+            queued_tids={r[0] for r in session.query(Retry.tid).filter(Retry.website==site_name,Retry.tid.in_(tid_list)).all()}
+        un_existing_ids = list(dict.fromkeys(tid for tid in tid_list if tid not in existing_article_tids and tid not in queued_tids and tid not in seen_tids))
+        seen_tids.update(un_existing_ids)
         logger.debug(f"[{site_name}][{section}] 尚未抓取的TID列表: {un_existing_ids}")
 
-        for tid in tid_list:
+        for tid in un_existing_ids:
             check_stop()
-            if tid in existing_article_tids:
-                continue
 
             try:
                 data = get_detail_func(tid)
@@ -118,11 +117,11 @@ def sync_article_common(
             success_count += len(articles)
 
         # 终止条件
-        empty_pages = 0 if un_existing_ids else empty_pages + 1
+        empty_pages = 0 if articles else empty_pages + 1
         if use_stop_threshold:
-            logger.info(f"[{site_name}][{section}] 连续未发现缺失帖子页数：{empty_pages}/{stop_after_empty_pages}")
+            logger.info(f"[{site_name}][{section}] 本页尝试 {len(un_existing_ids)} 条，成功入库 {len(articles)} 条，连续无新增页数：{empty_pages}/{stop_after_empty_pages}")
             if empty_pages >= stop_after_empty_pages:
-                logger.info(f"[{site_name}][{section}] 连续 {empty_pages} 页未发现缺失帖子，结束采集")
+                logger.info(f"[{site_name}][{section}] 连续 {empty_pages} 页无新增，结束翻页")
                 break
 
         page += 1
@@ -155,7 +154,8 @@ def retry_fail(
     for tid in fail_id_list:
         check_stop()
         try:
-            data = get_detail_func(tid)
+            with logger.contextualize(retry_detail=True):
+                data = get_detail_func(tid)
             if not data:
                 remain_fail_ids.append(tid)
                 continue
@@ -171,9 +171,6 @@ def retry_fail(
             time.sleep(random.uniform(2, 3))
 
         except Exception:
-            logger.exception(
-                f"[{site_name}][{section}] TID {tid} 二次抓取仍失败"
-            )
             remain_fail_ids.append(tid)
 
     if articles:
@@ -181,7 +178,7 @@ def retry_fail(
     from app.collector.recovery import failures
     failures(site_name, section, remain_fail_ids)
     logger.info(
-        f"[{site_name}][{section}] 最终失败列表: {remain_fail_ids}"
+        f"[{site_name}][{section}] 本轮补抓汇总：共 {len(fail_id_list)} 条，已恢复 {len(articles)} 条，仍失败 {len(remain_fail_ids)} 条；失败项进入额外补抓队列"
     )
 
     return remain_fail_ids

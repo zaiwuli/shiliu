@@ -40,6 +40,7 @@ def record_items(tids):
  from app.collector.sync import settings
  if ids and settings()['mode']=='realtime':enqueue_sync({'ids':ids,'merge_status':'pending'},current_batch())
 def log_sink(message):
+ if message.record['extra'].get('retry_detail'):return
  batch=current_batch()
  if getattr(local,'logging',False):return
  if batch:

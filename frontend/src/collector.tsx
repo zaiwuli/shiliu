@@ -594,7 +594,7 @@ function App() {
               <section className="panel">
                 <h2>色花堂采集</h2>
                 <p>
-                  不填写结束页：连续指定页数未发现缺失帖子后停止，最多扫描 100 页。填写结束页：按指定范围扫描。已存在或已忽略的帖子会跳过。
+                  不填写结束页：连续指定页数没有成功新增文章后停止，最多扫描 100 页。填写结束页：按指定范围扫描。失败帖子交给补抓。
                 </p>
                 <label>
                   任务名称
@@ -641,7 +641,7 @@ function App() {
                     />
                   </label>
                   <label>
-                    连续无缺失页数（智能模式）
+                    连续无新增页数（智能模式）
                     <input type="number" min="1" max="100" disabled={!!end} value={emptyPages} onChange={(e) => setEmptyPages(Number(e.target.value))} />
                   </label>
                   <label>

@@ -49,8 +49,9 @@ def write_page(rows):
 
 def failures(website,section,tids):
  if not tids:return
+ from app.collector.runtime import current_batch
  with mutex:
-  path=store('failures',dict(website=website,section=section,tids=tids))
+  path=store('failures',dict(website=website,section=section,tids=tids,source_batch_id=current_batch()))
   apply(path)
 
 def replay():

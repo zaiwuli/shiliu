@@ -28,6 +28,9 @@ def read_console_logs():
 ICONS = {'DEBUG': '🔍', 'INFO': 'ℹ️', 'SUCCESS': '✅',
          'WARNING': '⚠️', 'ERROR': '❌', 'CRITICAL': '🚨'}
 
+def batch_log_filter(record):
+    return not record['extra'].get('retry_detail', False)
+
 
 def console_format(record):
     icon = ICONS.get(record['level'].name, 'ℹ️')
@@ -55,12 +58,12 @@ def setup_loguru_logger():
         f'{log_dir}/app.log', rotation='00:00', retention='7 days',
         compression='zip', encoding='utf-8', level='DEBUG',
         backtrace=False, diagnose=False,
-        format='{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}',
+        format='{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}', filter=batch_log_filter,
     )
     uru_logger.add(sys.stdout, format=console_format, level='INFO',
-                   colorize=False, backtrace=False, diagnose=False)
+                   colorize=False, backtrace=False, diagnose=False, filter=batch_log_filter)
     uru_logger.add(capture_console, format=console_format, level='INFO',
-                   backtrace=False, diagnose=False)
+                   backtrace=False, diagnose=False, filter=batch_log_filter)
     logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
     for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access', 'apscheduler'):
         log = logging.getLogger(name)
