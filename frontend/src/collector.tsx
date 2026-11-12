@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import './collector.css'
+import { LedgerPreview } from './ledger-preview'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -433,7 +434,7 @@ function App() {
               </div>
               <div className="toolbar">
                 <input
-                  placeholder="搜索标题或原帖 ID，如 #3898266"
+                  placeholder="搜索"
                   value={keyword}
                   onChange={(e) => setKeyword(e.target.value)}
                 />
@@ -1053,4 +1054,4 @@ function App() {
     </div>
   )
 }
-createRoot(document.getElementById('root')!).render(<App />)
+createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('ledger-preview') ? <LedgerPreview /> : <App />)
