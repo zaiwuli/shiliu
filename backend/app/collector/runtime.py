@@ -50,12 +50,12 @@ def log_sink(message):
   except Exception:pass
   finally:local.logging=False
 logger.add(log_sink)
-def launch(params):
+def launch(params,name='色花堂采集',trigger='manual'):
  global active,phase
  with lock:
   if active is not None:raise ValueError('已有采集任务运行，请先停止或等待完成')
   with session_scope() as db:
-   b=Batch(kind='crawl');db.add(b);db.flush();bid=b.id
+   b=Batch(kind='crawl',details={'name':name,'trigger':trigger,'params':params,'sections':{}});db.add(b);db.flush();bid=b.id
   active=bid;phase='crawling';stop.clear();pool.submit(run,bid,params);return bid
 def run(bid,params):
  global active,phase
@@ -86,6 +86,11 @@ def run(bid,params):
   try:
    with session_scope() as db:
     b=db.get(Batch,bid);b.status=status;b.message=message;b.finished_at=datetime.now(timezone.utc)
+    if status in ('stopped','failed'):
+     details=dict(b.details or {});parts={k:dict(v) for k,v in details.get('sections',{}).items()}
+     for part in parts.values():
+      if part.get('reason')=='正在采集':part['reason']='用户停止' if status=='stopped' else '任务异常中断'
+     details['sections']=parts;b.details=details
   except Exception:logger.exception('任务结果保存失败，已保留本地缓冲')
   finally:
    local.batch_id=None

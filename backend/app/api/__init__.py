@@ -26,7 +26,7 @@ def schedule():
  if cfg["mode"]=="scheduled":scheduler.add_job(sync.process,CronTrigger.from_crontab(cfg["cron"]),id="sync-scheduled",max_instances=1)
  with session_scope() as db:
   for t in db.query(Task).filter(Task.enabled==True).all():
-   if t.cron:scheduler.add_job(runtime.launch,CronTrigger.from_crontab(t.cron),args=[t.params],id=str(t.id),max_instances=1)
+   if t.cron:scheduler.add_job(runtime.launch,CronTrigger.from_crontab(t.cron),args=[t.params,t.name,'scheduled'],id=str(t.id),max_instances=1)
 @asynccontextmanager
 async def lifespan(app):
  from sqlalchemy import inspect
@@ -220,7 +220,7 @@ def delete_task(tid:int):
  schedule();return {'ok':True}
 @app.post('/api/tasks/run')
 def run(p:Plan):
- try:return {'batch_id':runtime.launch(p.params())}
+ try:return {'batch_id':runtime.launch(p.params(),p.name,'manual')}
  except ValueError as e:raise HTTPException(409,str(e))
 @app.post('/api/tasks/stop')
 def stop():runtime.stop.set();return {'message':'将在当前请求或步骤结束后停止'}
@@ -242,6 +242,18 @@ def sync_history():
    else:rows.append(service.serialize(b))
    if len(rows)>=100:break
   return rows
+@app.get('/api/ledger')
+def ledger_list(page:int=1,page_size:int=10,trigger:str=''):
+ from app.collector.ledger import listing
+ if page_size not in (5,10,20):raise HTTPException(422,'每页条数应为 5、10 或 20')
+ if trigger not in ('','manual','scheduled','import'):raise HTTPException(422,'未知任务类型')
+ return listing(page,page_size,trigger)
+@app.get('/api/ledger/{bid}')
+def ledger_detail(bid:int):
+ from app.collector.ledger import detail
+ result=detail(bid)
+ if result is None:raise HTTPException(404,'采集或导入任务不存在')
+ return result
 @app.get('/api/runtime-logs')
 def runtime_logs():
  from app.utils.log import read_console_logs

@@ -3,6 +3,7 @@ from sqlalchemy.dialects.postgresql import ARRAY
 from app.core.database import Base
 class Article(Base):
  __tablename__='shiliu_article'
+ origin_batch_id=Column(BigInteger,index=True)
  id=Column(BigInteger,primary_key=True);tid=Column(BigInteger,nullable=False);website=Column(String(32),nullable=False,default='sehuatang');title=Column(Text,nullable=False);match_number=Column(String(64));publish_date=Column(Date);magnet=Column(ARRAY(Text));edk=Column(ARRAY(Text));preview_images=Column(ARRAY(Text));detail_url=Column(Text);size=Column(BigInteger);section=Column(Text,nullable=False);category=Column(Text);source=Column(String(24),default='crawl');batch_id=Column(BigInteger,index=True);merge_status=Column(String(24),default='pending');error=Column(Text);merged_at=Column(DateTime(timezone=True));create_time=Column(DateTime(timezone=True),server_default=func.now());update_time=Column(DateTime(timezone=True),onupdate=func.now())
  __table_args__=(UniqueConstraint('tid','website',name='shiliu_article_source_unique'),)
 class Task(Base):
@@ -10,6 +11,7 @@ class Task(Base):
  id=Column(BigInteger,primary_key=True);name=Column(Text,nullable=False);params=Column(JSON,default=dict);cron=Column(Text);enabled=Column(Boolean,default=False)
 class Batch(Base):
  __tablename__='shiliu_batch'
+ details=Column(JSON)
  id=Column(BigInteger,primary_key=True);kind=Column(Text);status=Column(Text,default='running');message=Column(Text);create_time=Column(DateTime(timezone=True),server_default=func.now());finished_at=Column(DateTime(timezone=True))
 class TaskLog(Base):
  __tablename__='shiliu_task_log'

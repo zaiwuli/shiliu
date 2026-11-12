@@ -1,12 +1,13 @@
 """Durable write-ahead files for parsed pages and failed-post registration."""
 import json, os, threading, uuid
+from collections import Counter
 from pathlib import Path
 from datetime import date
 from sqlalchemy.exc import OperationalError, InterfaceError
 from sqlalchemy.dialects.postgresql import insert
 from app.core.config import data_path
 from app.core.database import session_scope
-from app.models import Article
+from app.models import Article,Batch
 from app.utils.log import logger
 mutex=threading.RLock()
 root=Path(data_path)/'recovery'
@@ -29,7 +30,16 @@ def apply(path):
   for row in rows:
    if isinstance(row.get('publish_date'),str):row['publish_date']=date.fromisoformat(row['publish_date'])
   with session_scope() as db:
-   db.execute(insert(Article).values(rows).on_conflict_do_nothing(index_elements=['tid','website']))
+   created=db.execute(insert(Article).values(rows).on_conflict_do_nothing(index_elements=['tid','website']).returning(Article.batch_id,Article.origin_batch_id,Article.section)).all()
+   counts=Counter((origin_id or batch_id,section,'recovered' if origin_id and origin_id!=batch_id else 'added') for batch_id,origin_id,section in created)
+   for owner in sorted({key[0] for key in counts if key[0] is not None}):
+    batch=db.query(Batch).filter(Batch.id==owner).with_for_update().first()
+    if batch:
+     details=dict(batch.details or {});parts=dict(details.get('sections',{}))
+     for (bid,section,key),count in counts.items():
+      if bid!=owner:continue
+      part=dict(parts.get(section,{}));part[key]=part.get(key,0)+count;parts[section]=part
+     details['sections']=parts;batch.details=details
   # Include already-present rows: a previous commit may have succeeded before the connection dropped.
   from app.collector.runtime import record_items
   record_items([r['tid'] for r in rows])

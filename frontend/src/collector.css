@@ -556,3 +556,41 @@ main, .panel, .table-wrap {min-width:0}
 
 .retry-actions {white-space:nowrap}.retry-actions .record-link {margin-right:12px;color:#527c78;text-decoration:none}.retry-actions button {padding:6px 10px;font-size:12px}
 @media(max-width:640px){.retry-actions {display:flex!important;align-items:center;gap:10px;flex-wrap:wrap}.retry-actions[data-label]::before{content:none}.retry-actions .record-link {margin-right:0}}
+
+/* Compact working screens; retain the mobile article-card layout. */
+.compact-articles header,.compact-tasks header{margin-bottom:16px}
+.compact-articles .stats{margin:12px 0 10px;gap:8px}
+.compact-articles .stats>div{padding:10px 14px;min-height:62px}
+.compact-articles .stats strong{font-size:20px;margin-top:3px}
+.compact-articles .stats>div:nth-child(n+3) strong{font-size:14px;padding-top:3px}
+.compact-articles .sync-card{padding:10px 14px;margin-bottom:10px;background:#f6f8fa}
+.compact-articles .sync-card p{margin:5px 0 0;font-size:12px}
+.compact-articles .status-tabs{margin:10px 0;gap:5px}
+.compact-articles .status-tabs button{padding:7px 13px;font-size:12px}
+.compact-articles .article-panel{padding:14px;margin-top:10px}
+.compact-articles .toolbar{gap:7px;margin-bottom:10px}
+.compact-articles .article-tools{padding-bottom:10px;margin-bottom:10px}
+.compact-articles button,.compact-tasks button{padding:7px 11px;font-size:12px}
+.compact-articles input:not([type=checkbox]),.compact-articles select{padding:8px 10px;font-size:13px}
+.compact-articles .batch-actions:empty{display:none}
+.compact-articles .batch-actions{min-height:24px;font-size:12px}
+.compact-articles .article-table td,.compact-articles .article-table th{padding:9px 8px;font-size:12px}
+.compact-articles .text-button{font-size:13px;line-height:1.5;padding:2px 0}
+.compact-tasks .panel{padding:16px;margin:12px 0}
+.compact-tasks .panel>p{font-size:12px;margin:6px 0 10px}
+.compact-tasks .grid{gap:12px}
+.compact-tasks label{margin:8px 0;font-size:12px}
+.compact-tasks label>input:not([type=checkbox]){padding:8px 10px;margin-top:5px;font-size:13px}
+.compact-tasks .boards{gap:6px;margin:8px 0 12px}
+.compact-tasks .boards label{padding:7px 10px;margin:0;font-size:12px}
+.compact-tasks .list-row{padding:12px 0;gap:12px}
+.compact-tasks .list-row strong{font-size:13px}.compact-tasks .list-row p{font-size:12px;margin:5px 0 0}
+@media(max-width:640px){.compact-articles .stats>div{padding:8px;min-height:58px}.compact-articles .stats strong{font-size:17px}.compact-articles .stats>div:nth-child(n+3) strong{font-size:12px}.compact-articles .article-panel,.compact-tasks .panel{padding:12px}.compact-articles .article-table td{padding:2px 0}.compact-tasks .grid{gap:8px}}
+
+.compact-tasks .boards{display:flex;flex-wrap:wrap;gap:5px 8px}
+.compact-tasks .boards label{display:inline-flex;align-items:center;gap:5px;border:1px solid #e0e6eb;border-radius:6px;padding:6px 8px}
+.compact-tasks .boards input{margin:0}.compact-tasks .boards small{display:none}
+.compact-tasks .grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.compact-tasks .panel>label:first-of-type{max-width:440px}
+@media(max-width:1000px){.compact-tasks .grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.compact-tasks .grid{grid-template-columns:minmax(0,1fr)}}

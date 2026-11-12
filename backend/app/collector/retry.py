@@ -33,7 +33,7 @@ def launch(ids=None):
    sources={r.source_batch_id for r in rows}
    source_label='、'.join(f'采集任务 #{i}' for i in sorted(sources-{None}))
    if None in sources:source_label+='、历史补抓记录' if source_label else '历史补抓记录'
-   bid=Batch(kind='retry',status='running',message=f'{source_label}：补抓中');db.add(bid);db.flush();batch_id=bid.id
+   bid=Batch(kind='retry',status='running',message=f'{source_label}：补抓中',details={'source_batches':sorted(sources-{None}),'manual':ids is not None,'total':len(rows)});db.add(bid);db.flush();batch_id=bid.id
    selected=[r.id for r in rows]
    for r in rows:r.resume_status=r.status;r.status='running'
   runtime.active=batch_id;runtime.phase='retrying';runtime.stop.clear()
@@ -57,7 +57,7 @@ def run(bid,ids,manual,source_label):
   for rid in ids:
    runtime.check_stop()
    with session_scope() as db:
-    r=db.get(Retry,rid);tid=r.tid;section=r.section;website=r.website
+    r=db.get(Retry,rid);tid=r.tid;section=r.section;website=r.website;origin=r.source_batch_id
     exists=db.query(Article).filter_by(tid=tid,website=website).first() is not None
    error=None
    try:
@@ -65,7 +65,7 @@ def run(bid,ids,manual,source_label):
      data=None if exists else sht.crawler_detail(tid, expanded_links=True)
    except Exception as e:data=None;error=f'{type(e).__name__}: {e}'
    if data:
-    data.update(tid=tid,section=section,website=website,match_number=_extract_article_match_number(data.get('title')))
+    data.update(tid=tid,section=section,website=website,origin_batch_id=origin,match_number=_extract_article_match_number(data.get('title')))
     save_articles([Article(**data)])
    with session_scope() as db:
     r=db.get(Retry,rid)
@@ -89,6 +89,7 @@ def run(bid,ids,manual,source_label):
      r.status=r.resume_status or ('manual' if r.auto_attempts>=3 else 'waiting')
     summary=f'{source_label} · {"手动" if manual else "自动"}补抓：本轮 {len(ids)} 条，已处理 {processed} 条，已恢复 {stats["recovered"]} 条，等待下轮 {stats["waiting"]} 条，需手动处理 {stats["manual"]} 条，未执行 {len(ids)-processed} 条'
     b=db.get(Batch,bid);b.status='completed' if completed else 'interrupted';b.finished_at=datetime.now(timezone.utc);b.message=summary
+    b.details={**(b.details or {}),'processed':processed,'stats':stats}
    logger.info(summary)
   finally:
    runtime.local.batch_id=None

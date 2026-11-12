@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import './collector.css'
-import { LedgerPreview } from './ledger-preview'
+import { Ledger } from './ledger'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -102,7 +102,6 @@ function App() {
   const csvInput = useRef<HTMLInputElement>(null)
   const [taskTab, setTaskTab] = useState('采集配置')
   const [settingsTab, setSettingsTab] = useState('网络')
-  const [syncHistory, setSyncHistory] = useState<{id:number;create_time:string;status:string;message:string}[]>([])
 
   const [retryLinks,setRetryLinks]=useState<{tid:number;detail_url:string;title:string|null;magnet:string[];edk:string[]}|null>(null)
   const [retryStatus,setRetryStatus]=useState('waiting')
@@ -192,7 +191,6 @@ function App() {
       confirmation: string
       sections: string[]
     } | null>(null)
-  useEffect(() => {if (page === '日志' && logTab === '同步记录') api('/sync/history').then(setSyncHistory).catch((e) => setError(e.message))}, [page, logTab])
   useEffect(()=>{if(page!=='采集任务'||taskTab!=='失败补抓')return;loadRetries().catch(e=>setError(e.message));const timer=setInterval(()=>loadRetries().catch(()=>{}),5000);return()=>clearInterval(timer)},[page,taskTab,retryStatus,retryPage])
   const filters = () => ({
     merge_status: statusFilter || null,
@@ -282,7 +280,7 @@ function App() {
           ))}
         </nav>
       </aside>
-      <main>
+      <main className={page==='文章管理'?'compact-articles':page==='采集任务'?'compact-tasks':undefined}>
         <header>
           <div>
             <h1>{page}</h1>
@@ -335,7 +333,7 @@ function App() {
         )}
         {page === '日志' && (
           <div className="subnav">
-            {['运行日志', '采集记录', '同步记录'].map((t) => (
+            {['运行日志', '采集台账', '同步台账'].map((t) => (
               <button
                 key={t}
                 className={logTab === t ? 'selected' : ''}
@@ -371,7 +369,7 @@ function App() {
         {error && <div className="error">{error}</div>}
         {page === '文章管理' && (
           <>
-        <section className="panel sync-card"><div className="toolbar"><h2>同步动态</h2><button onClick={() => {setPage('日志');setLogTab('同步记录')}}>查看历史</button></div>                {syncProgress && (syncProgress.running || syncProgress.total > 0 || syncProgress.error) && (
+        <section className="panel sync-card"><div className="toolbar"><h2>同步动态</h2><button onClick={() => {setPage('日志');setLogTab('同步台账')}}>查看历史</button></div>                {syncProgress && (syncProgress.running || syncProgress.total > 0 || syncProgress.error) && (
                   <span role="status">
                     {syncProgress.running ? '同步中' : '同步结束'}：{syncProgress.processed}/{syncProgress.total}
                     {' · '}{chineseLog(syncProgress.stats)}
@@ -704,7 +702,7 @@ function App() {
                       <strong>{t.name}</strong>
                       <p>
                         {t.cron || '手动'} · {t.enabled ? '已启用' : '未启用'} ·{' '}
-                        {JSON.stringify(t.params)}
+                        {((t.params.section_id_list as string[]) || []).map(id=>overview.sections[id] || id).join('、')} · 第 {String(t.params.start_page || 1)} 页起 · {t.params.max_page ? `至 ${t.params.max_page} 页` : `连续 ${t.params.stop_after_empty_pages || 3} 页无新增停止`}
                       </p>
                     </div>
                     <button
@@ -854,52 +852,7 @@ function App() {
             </button>
           </section>
         )}
-        {page === '日志' && logTab === '同步记录' && (
-          <section className="panel">
-            <div className="toolbar"><h2>同步记录</h2><button onClick={() => api('/sync/history').then(setSyncHistory)}>刷新</button></div>
-            {!syncHistory.length && <div className="empty">暂无同步历史，新版运行后开始记录。</div>}
-            {syncHistory.map((entry) => <div className="list-row" key={entry.id}><div><strong>#{entry.id} · {new Date(entry.create_time).toLocaleString()} · {chineseLog(entry.status)}</strong><p>{chineseLog(entry.message)}</p></div><button onClick={() => {setOutput(chineseLog(entry.message));setLogTab('详细日志')}}>查看详情</button></div>)}
-          </section>
-        )}
-        {page === '日志' && logTab === '采集记录' && (
-          <section className="panel">
-            <h2>采集记录</h2>
-            {overview.batches.map((b) => (
-              <div className="list-row" key={b.id}>
-                <div>
-                  <strong>
-                    #{b.id} · {chineseLog(b.kind)} · {chineseLog(b.status)}
-                  </strong>
-                  <p>{b.message ? chineseLog(b.message) : '处理中'}</p>
-                </div>
-                <button
-                  onClick={() =>
-                    action(async () => {
-                      const rows = await api('/logs/' + b.id)
-                      setLogTab('详细日志')
-                      setOutput(
-                        rows.length
-                          ? rows
-                              .map(
-                                (row: {
-                                  create_time: string
-                                  message: string
-                                }) =>
-                                  `${new Date(row.create_time).toLocaleString()}  ${row.message}`,
-                              )
-                              .join('\n')
-                          : '暂无详细日志',
-                      )
-                      return undefined
-                    })
-                  }
-                >
-                  日志
-                </button>
-              </div>
-            ))}
-          </section>
-        )}
+        {page === '日志' && ['采集台账','同步台账'].includes(logTab) && <Ledger mode={logTab==='同步台账'?'sync':'crawl'} />}
         {page === '日志' && logTab === '运行日志' && (
           <section className="panel">
             <div className="toolbar">
@@ -1054,4 +1007,4 @@ function App() {
     </div>
   )
 }
-createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).has('ledger-preview') ? <LedgerPreview /> : <App />)
+createRoot(document.getElementById('root')!).render(<App />)

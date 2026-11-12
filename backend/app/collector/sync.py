@@ -32,14 +32,17 @@ def process(filters=None,reserved=False,operation=None,wait=False):
  window=datetime.now(timezone.utc).replace(second=0,microsecond=0)
  window=window.replace(minute=(window.minute//5)*5)
  stats={'inserted':0,'existing':0,'skipped':0,'failed':0,'conflict':0}
+ source_batches=[]
  with progress_lock:progress.update(running=True,processed=0,total=0,stats=dict(stats),error=None)
  try:
   with session_scope() as db:
    ids=[item[0] for item in filtered(db,filters or {}).with_entities(Article.id).order_by(Article.id).all()]
+   from sqlalchemy import func
+   source_batches=[r[0] for r in filtered(db,filters or {}).with_entities(func.coalesce(Article.origin_batch_id,Article.batch_id)).distinct().all() if r[0] is not None]
   with progress_lock:progress.update(running=True,processed=0,total=len(ids),stats=dict(stats),error=None)
   if not realtime:
    with session_scope() as db:
-    history=Batch(kind='sync',status='running',message=json.dumps({'operation':operation or ('实时同步' if wait else '手动或定时同步'),'total':len(ids)},ensure_ascii=False));db.add(history);db.flush();history_id=history.id
+    history=Batch(kind='sync',status='running',details={'source_batches':source_batches},message=json.dumps({'operation':operation or ('实时同步' if wait else '手动或定时同步'),'total':len(ids)},ensure_ascii=False));db.add(history);db.flush();history_id=history.id
   (logger.debug if realtime else logger.info)(f'开始转换同步，共 {len(ids)} 条文章')
   for offset in range(0,len(ids),500):
    with session_scope() as db:
@@ -100,6 +103,7 @@ def process(filters=None,reserved=False,operation=None,wait=False):
      for name,value in stats.items():summary['stats'][name]=summary['stats'].get(name,0)+value
      if progress.get('error'):summary['errors']=(summary['errors']+[progress['error']])[-20:]
      history.status='failed' if summary['errors'] else 'completed';history.finished_at=datetime.now(timezone.utc);history.message=json.dumps(summary,ensure_ascii=False)
+     history.details={'source_batches':sorted(set((history.details or {}).get('source_batches',[]))|set(source_batches))}
    if history_id:
     with session_scope() as db:
      history=db.get(Batch,history_id);history.status='failed' if progress.get('error') else 'completed';history.finished_at=datetime.now(timezone.utc)

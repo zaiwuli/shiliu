@@ -39,6 +39,8 @@ def sync_article_common(
     empty_pages = 0
     stop_after_empty_pages = max(1, int(stop_after_empty_pages))
     last_page = start_page - 1
+    from app.collector.ledger import update_section
+    update_section(current_batch(),section,page=None,reason='正在采集')
 
     while page <= max_page:
         check_stop()
@@ -64,12 +66,14 @@ def sync_article_common(
             time.sleep(5)
 
         if not tid_list:
+            update_section(current_batch(),section,reason='列表页连续三次获取失败')
             logger.warning(
                 f"[{site_name}][{section}] 连续3次抓取第{page}页失败，退出"
             )
             break
 
         last_page = page
+        update_section(current_batch(),section,page=page)
         min_tid = min(tid_list)
         logger.info(f"[{site_name}][{section}] 当前页最小TID: {min_tid}")
 
@@ -122,11 +126,14 @@ def sync_article_common(
             logger.info(f"[{site_name}][{section}] 本页尝试 {len(un_existing_ids)} 条，成功入库 {len(articles)} 条，连续无新增页数：{empty_pages}/{stop_after_empty_pages}")
             if empty_pages >= stop_after_empty_pages:
                 logger.info(f"[{site_name}][{section}] 连续 {empty_pages} 页无新增，结束翻页")
+                update_section(current_batch(),section,reason=f'连续 {empty_pages} 页无新增')
                 break
 
         page += 1
 
+    if page>max_page:update_section(current_batch(),section,reason='达到指定结束页' if not use_stop_threshold else '达到扫描上限')
     retry_fail_id_list = retry_fail(site_name, section_id, section_map, get_detail_func, fail_id_list)
+    update_section(current_batch(),section,failed=len(retry_fail_id_list))
     return success_count, last_page, retry_fail_id_list
 
 
@@ -190,7 +197,7 @@ def save_articles(articles):
     rows=[]
     for a in articles:
         row={key:getattr(a,key) for key in ('tid','title','website','match_number','publish_date','magnet','edk','preview_images','detail_url','size','section','category')}
-        row.update(batch_id=current_batch(),source='crawl',merge_status='pending')
+        row.update(batch_id=current_batch(),origin_batch_id=a.origin_batch_id,source='crawl',merge_status='pending')
         rows.append(row)
     write_page(rows)
 

@@ -42,7 +42,7 @@ def filtered(db,filters):
 def ingest(rows,kind):
  count={'inserted':0,'existing':0,'failed':0,'errors':[]}
  with session_scope() as db:
-  b=Batch(kind=kind,status='running');db.add(b);db.flush();bid=b.id
+  b=Batch(kind=kind,status='running',details={'name':'CSV 导入' if kind=='file' else '旧库导入','trigger':'import','sections':{}});db.add(b);db.flush();bid=b.id
   for index,row in enumerate(rows):
    try:
     with db.begin_nested():
@@ -53,7 +53,9 @@ def ingest(rows,kind):
       count['existing']+=1;continue
      date=row.get('publish_date');date=pd.to_datetime(date).date() if date else None
      a=Article(tid=tid,website=website,title=title,section=section,category=row.get('category'),match_number=row.get('match_number') or row.get('number'),publish_date=date,magnet=links(row.get('magnet')),edk=links(row.get('edk')),preview_images=links(row.get('preview_images')),detail_url=row.get('detail_url'),size=int(row['size']) if row.get('size') is not None else None,source=kind,batch_id=bid,merge_status='pending')
-     db.add(a);db.flush();count['inserted']+=1
+     db.add(a);db.flush()
+    count['inserted']+=1
+    meta=dict(b.details);parts=dict(meta['sections']);part=dict(parts.get(section,{}));part['added']=part.get('added',0)+1;parts[section]=part;meta['sections']=parts;b.details=meta
    except Exception as e:
     count['failed']+=1
     if len(count['errors'])<50:count['errors'].append({'row':index+2,'error':str(e)})
