@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react'
+import { Fragment, useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import './collector.css'
 import { Ledger } from './ledger'
@@ -104,10 +104,21 @@ function App() {
   const [settingsTab, setSettingsTab] = useState('网络')
 
   const [retryLinks,setRetryLinks]=useState<{tid:number;detail_url:string;title:string|null;magnet:string[];edk:string[]}|null>(null)
+  const [retryExpanded,setRetryExpanded]=useState<number|null>(null)
+  const [retryDetailError,setRetryDetailError]=useState('')
+  const [retryDetailLoading,setRetryDetailLoading]=useState(false)
+  const retryRequest=useRef(0)
+  const toggleRetry=(id:number)=>{
+    const request=++retryRequest.current
+    if(retryExpanded===id){setRetryExpanded(null);return}
+    setRetryExpanded(id);setRetryLinks(null);setRetryDetailError('');setRetryDetailLoading(true)
+    api(`/retries/${id}/links`).then(r=>{if(retryRequest.current===request)setRetryLinks(r)}).catch(e=>{if(retryRequest.current===request)setRetryDetailError(e.message)}).finally(()=>{if(retryRequest.current===request)setRetryDetailLoading(false)})
+  }
   const [retryStatus,setRetryStatus]=useState('waiting')
   const [retryRows,setRetryRows]=useState<{id:number;tid:number;section:string;status:string;auto_attempts:number;manual_attempts:number;error:string;next_run:string|null}[]>([])
   const [retryTotal,setRetryTotal]=useState(0)
   const [retryPage,setRetryPage]=useState(1)
+  useEffect(()=>{retryRequest.current++;setRetryExpanded(null);setRetryLinks(null)},[retryStatus,retryPage])
   const [retrySelected,setRetrySelected]=useState<number[]>([])
   const [retryAll,setRetryAll]=useState(false)
   const loadRetries=async()=>{const r=await api(`/retries?status=${retryStatus}&page=${retryPage}`);setRetryRows(r.items);setRetryTotal(r.total)}
@@ -584,7 +595,9 @@ function App() {
           {retryStatus!=='running'&&<div className="toolbar"><label><input type="checkbox" checked={retryAll} onChange={e=>{setRetryAll(e.target.checked);setRetrySelected([])}}/>选择筛选全部（{retryTotal}）</label>
           {['waiting','manual'].includes(retryStatus)&&<button onClick={()=>retryAction('run')}>手动补抓</button>}
           <button onClick={()=>retryAction('restart')}>重新开启自动补抓</button><button onClick={()=>retryAction('ignore')}>忽略</button><button className="danger" onClick={()=>retryAction('delete')}>删除记录</button></div>}
-          <table className="retry-table"><thead><tr><th></th><th>帖子 / 板块</th><th>自动 / 手动次数</th><th>最近原因</th><th>下次执行</th><th>操作</th></tr></thead><tbody>{retryRows.map(r=><tr key={r.id}><td><input type="checkbox" disabled={r.status==='running'||retryAll} checked={retryAll||retrySelected.includes(r.id)} onChange={e=>setRetrySelected(e.target.checked?[...retrySelected,r.id]:retrySelected.filter(i=>i!==r.id))}/></td><td><a href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">{r.tid}</a><p>{r.section}</p></td><td data-label="自动 / 手动次数">{r.auto_attempts} / {r.manual_attempts}</td><td data-label="最近原因">{r.error||'—'}</td><td data-label="下次执行">{r.next_run?new Date(r.next_run).toLocaleString():'—'}</td><td className="retry-actions" data-label="操作"><a className="record-link" href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">原帖 ↗</a>{r.status==='recovered'&&<button onClick={()=>api(`/retries/${r.id}/links`).then(setRetryLinks).catch(e=>setError(e.message))}>核对链接</button>}</td></tr>)}</tbody></table>
+          <div className="table-wrap"><table className="retry-table retry-compact"><thead><tr><th></th><th>帖子 / 板块</th><th>自动 / 手动</th><th>最近原因</th><th>下次执行</th></tr></thead><tbody>{retryRows.map(r=><Fragment key={r.id}><tr className={`retry-click-row ${retryExpanded===r.id?'ledger-row-open':''}`} tabIndex={0} aria-expanded={retryExpanded===r.id} aria-label={`帖子 ${r.tid} 补抓明细`} onClick={()=>toggleRetry(r.id)} onKeyDown={e=>{if(e.target===e.currentTarget&&(e.key==='Enter'||e.key===' ')){e.preventDefault();toggleRetry(r.id)}}}><td onClick={e=>e.stopPropagation()}><input type="checkbox" disabled={r.status==='running'||retryAll} checked={retryAll||retrySelected.includes(r.id)} onChange={e=>setRetrySelected(e.target.checked?[...retrySelected,r.id]:retrySelected.filter(i=>i!==r.id))}/></td><td><span className="retry-post-line"><span>#{r.tid}</span><span className="retry-section">{r.section}</span></span></td><td data-label="自动 / 手动次数">{r.auto_attempts} / {r.manual_attempts}</td><td data-label="最近原因">{r.error||'—'}</td><td data-label="下次执行">{r.next_run?new Date(r.next_run).toLocaleString():'—'}</td></tr>
+          {retryExpanded===r.id&&<tr className="retry-inline-row"><td colSpan={5}><div className="retry-inline-detail"><div className="toolbar"><strong>#{r.tid} · {r.section}</strong><a href={`https://sehuatang.org/thread-${r.tid}-1-2.html`} target="_blank" rel="noreferrer">查看原帖</a></div>{retryDetailLoading?<p>正在读取链接…</p>:retryDetailError?<p role="alert">{retryDetailError}</p>:retryLinks&&<><p>{retryLinks.title||'暂未采集入库'}</p><div className="retry-link-group"><h3>磁力（{retryLinks.magnet.length}）</h3><pre>{retryLinks.magnet.join('\n\n')||'无'}</pre><h3>ED2K（{retryLinks.edk.length}）</h3><pre>{retryLinks.edk.join('\n\n')||'无'}</pre></div>{(retryLinks.magnet.length>0||retryLinks.edk.length>0)&&<button onClick={()=>navigator.clipboard.writeText([...retryLinks.magnet,...retryLinks.edk].join('\n')).catch(()=>setError('当前浏览器无法复制，请长按链接手动复制'))}>复制全部链接</button>}</>}</div></td></tr>}
+          </Fragment>)}</tbody></table></div>
           {!retryRows.length&&<p>暂无记录</p>}<div className="toolbar"><span>共 {retryTotal} 条 · 第 {retryPage} 页</span><button disabled={retryPage<=1} onClick={()=>{setRetryPage(retryPage-1);setRetrySelected([])}}>上一页</button><button disabled={retryPage*50>=retryTotal} onClick={()=>{setRetryPage(retryPage+1);setRetrySelected([])}}>下一页</button></div>
         </section>}
         {page === '采集任务' && (
@@ -873,7 +886,7 @@ function App() {
             <pre>{output || '请在批次记录中选择一条日志。'}</pre>
           </section>
         )}
-        {retryLinks&&<div className="modal" onClick={()=>setRetryLinks(null)}><section className="panel" onClick={e=>e.stopPropagation()}><div className="toolbar"><h2>补抓结果 · {retryLinks.tid}</h2><button onClick={()=>setRetryLinks(null)}>关闭</button></div><p>{retryLinks.title||'文章记录不存在'}</p><a href={retryLinks.detail_url} target="_blank" rel="noreferrer">打开原帖网页 ↗</a><h3>磁力链接（{retryLinks.magnet.length}）</h3><pre>{retryLinks.magnet.join('\n\n')||'无'}</pre><h3>ED2K（{retryLinks.edk.length}）</h3><pre>{retryLinks.edk.join('\n\n')||'无'}</pre><button onClick={()=>navigator.clipboard.writeText([...retryLinks.magnet,...retryLinks.edk].join('\n')).catch(()=>setError('当前浏览器无法复制，请长按链接手动复制'))}>复制全部链接</button><p>此处展示实际入库链接，请与原帖核对。</p></section></div>}
+
         {resolution && (
           <div className="modal" onClick={() => setResolution(null)}>
             <section className="panel" style={{maxWidth:'1000px',maxHeight:'85vh',overflow:'auto'}} onClick={(e) => e.stopPropagation()}>
