@@ -10,7 +10,7 @@ curl_cffi
 bencoder
 loguru
 apscheduler
-requests
+requests[socks]
 pandas
 openpyxl
 xlrd
