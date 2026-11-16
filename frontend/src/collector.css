@@ -602,3 +602,22 @@ main, .panel, .table-wrap {min-width:0}
 /* Readable controls with compact section spacing. */
 button{min-height:36px}input:not([type=checkbox]):not([type=radio]),select{min-height:38px}.compact-articles button,.compact-tasks button{padding:8px 12px}.compact-articles .article-table td,.compact-articles .article-table th{padding:10px 9px}.compact-tasks .boards label{padding:7px 10px}.compact-articles .text-button{min-height:0}.compact-tasks .panel>p{line-height:1.7}
 @media(max-width:640px){button{min-height:40px}input:not([type=checkbox]):not([type=radio]),select{min-height:42px}.compact-articles .article-table td{padding:3px 0}.subnav{gap:6px;flex-wrap:wrap}}
+
+/* A single compact navigation row replaces the desktop branding on small screens. */
+@media (max-width:850px) {
+  .shell > aside {padding:6px 8px;border-bottom:1px solid #285056}
+  .shell > aside .brand,.shell > aside .brand-caption {display:none}
+  .shell > aside nav {display:flex;flex-wrap:nowrap;gap:3px;width:100%}
+  .shell > aside nav button {flex:1 1 0;min-width:0;min-height:44px;padding:10px 3px;text-align:center;white-space:nowrap;font-size:14px;letter-spacing:0;border-radius:7px}
+  .shell > main {padding:16px 12px calc(20px + env(safe-area-inset-bottom));min-width:0}
+  .shell > main > header {margin-bottom:12px;gap:12px}
+  .shell > main > header h1 {font-size:22px;line-height:1.4;margin:0}
+  .shell > main > header .page-caption {display:none}
+  .shell > main > header > button {min-height:40px;padding:7px 13px;font-size:14px;flex-shrink:0}
+  .shell .subnav {flex-wrap:nowrap;overflow-x:auto;gap:0;margin-bottom:14px;scrollbar-width:thin}
+  .shell .subnav button {flex:0 0 auto;white-space:nowrap;padding:10px 12px;font-size:15px;min-height:44px}
+  .avdb-settings {padding:16px}
+  .avdb-settings h2 {font-size:18px}
+  .avdb-settings label {margin:14px 0;font-size:15px}
+  .avdb-settings input {font-size:16px;min-width:0}
+}

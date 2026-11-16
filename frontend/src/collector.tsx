@@ -5,6 +5,8 @@ import { Ledger } from './ledger'
 import { AvdbSearch } from './avdb-search'
 import { AvdbSettings } from './avdb-settings'
 import { PushRecords } from './push-records'
+import { ImagePreview } from './image-preview'
+import './mobile.css'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -102,6 +104,22 @@ type Overview = {
   batches: { id: number; kind: string; status: string; message: string }[]
 }
 function App() {
+  const [mobileNavVisible, setMobileNavVisible] = useState(true)
+  useEffect(() => {
+    let previous = window.scrollY
+    let accumulated = 0
+    const onScroll = () => {
+      const current = Math.max(0, window.scrollY)
+      const delta = current - previous
+      if (Math.sign(delta) !== Math.sign(accumulated)) accumulated = 0
+      accumulated += delta
+      if (current < 32) setMobileNavVisible(true)
+      else if (Math.abs(accumulated) > 12) setMobileNavVisible(accumulated < 0)
+      previous = current
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const csvInput = useRef<HTMLInputElement>(null)
   const [taskTab, setTaskTab] = useState('采集配置')
   const [settingsTab, setSettingsTab] = useState('连接与推送')
@@ -176,6 +194,7 @@ function App() {
     [keyword, setKeyword] = useState(''),
     [selected, setSelected] = useState<number[]>([]),
     [detail, setDetail] = useState<Row | null>(null),
+    [detailPreview, setDetailPreview] = useState<number | null>(null),
     [output, setOutput] = useState(''),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(''),
@@ -287,7 +306,7 @@ function App() {
   })
   return (
     <div className="shell">
-      <aside>
+      <aside className={mobileNavVisible ? 'mobile-nav-visible' : 'mobile-nav-hidden'}>
         <div className="brand"><span className="brand-icon"><img src="/shiliu-icon.png" alt="" /></span><span>拾流</span></div>
         <div className="brand-caption">采集 · 整理 · 同步</div>
         <nav>
@@ -296,12 +315,13 @@ function App() {
               className={page === p ? 'active' : ''}
               key={p}
               onClick={() => {
+                setMobileNavVisible(true)
                 setPage(p)
                 setOutput('')
                 setError('')
               }}
             >
-              {p}
+              <span className="mobile-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d={({'文章管理':'M5 3h14v18H5z M8 7h8 M8 11h8 M8 15h5','AVDB 搜索':'M21 21l-5-5 M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0','采集任务':'M8 3h8v4H8z M6 5H4v16h16V5h-2 M8 12h8 M8 16h5','日志':'M5 3h14v18H5z M8 8h8 M8 12h8 M8 16h8','设置':'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8 M12 2v3 M12 19v3 M2 12h3 M19 12h3 M5 5l2 2 M17 17l2 2 M5 19l2-2 M17 7l2-2'} as Record<string,string>)[p]}/></svg></span><span>{p}</span>
             </button>
           ))}
         </nav>
@@ -1027,17 +1047,18 @@ function App() {
               </pre>
               <div className="images">
                 {detail.preview_images?.map((url, i) => (
-                  <img
+                  <button key={i} className="detail-image-button" aria-label={`预览文章图片 ${i + 1}`} onClick={() => setDetailPreview(i)}><img
                     loading="lazy"
-                    key={i}
                     src={url}
+                    alt={`文章图片 ${i + 1}`}
                     referrerPolicy="no-referrer"
-                  />
+                  /></button>
                 ))}
               </div>
             </section>
           </div>
         )}
+        {detail && detailPreview !== null && <ImagePreview items={[detail]} initialId={detail.tid} initialIndex={detailPreview} onClose={() => setDetailPreview(null)} />}
       </main>
     </div>
   )

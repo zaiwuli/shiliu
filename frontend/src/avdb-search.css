@@ -11,3 +11,21 @@
 .avdb-filter-row{margin-top:10px;gap:10px;align-items:center}.avdb-filter-row>label{margin:0;gap:0}.avdb-searchbar input{font-size:15px}.avdb-searchbar button{padding:10px 16px}.avdb-search-panel{margin-bottom:0}.avdb-section-tabs{padding-top:10px;padding-bottom:9px}.avdb-resultbar{margin:10px 0}.avdb-card-body{padding:14px}.avdb-title summary{line-height:1.65;min-height:66px}.avdb-card-actions button{padding:8px 14px}.avdb-dialog>label{gap:6px}.avdb-select{min-height:0}.avdb-cover{min-height:0}.avdb-image-count{font-size:12px}@media(max-width:700px){.avdb-searchbar input{font-size:15px}.avdb-title summary{font-size:16px;min-height:0}.avdb-card-body{padding:12px 0}.avdb-section-tabs{padding-top:9px}.avdb-filter-row{display:none}.avdb-mobile-filter{margin-top:8px}.avdb-quick small{font-size:12px}}
 .avdb-resultbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin:8px 0 12px}.avdb-result-controls{display:flex;align-items:center;gap:18px;flex-wrap:wrap}.avdb-select-all,.avdb-quick{display:inline-flex;align-items:center;gap:7px;margin:0;font-size:14px;white-space:nowrap}.avdb-result-count strong{font-size:15px;font-weight:500}.avdb-result-controls .avdb-view{margin-left:0}.avdb-result-controls input[type=checkbox]{width:17px;height:17px;margin:0}.avdb-section-tabs{padding-top:9px;padding-bottom:8px}.page-caption:empty{display:none}.avdb-tool .avdb-filter-row{margin-top:8px}.avdb-tool .avdb-results.grid{gap:14px}@media(max-width:700px){.avdb-resultbar{flex-wrap:nowrap;gap:10px}.avdb-result-controls{gap:12px}.avdb-select-all,.avdb-quick{font-size:14px}.avdb-result-count strong{font-size:14px}.avdb-tool .avdb-results.grid{gap:14px}}
 .avdb-static-title{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;font-size:15px;font-weight:500;line-height:1.65;margin:8px 0 10px;min-height:0;overflow-wrap:anywhere;cursor:default}@media(max-width:700px){.avdb-static-title{font-size:16px}}
+@media(max-width:700px){
+ .avdb-tool .avdb-searchbar{padding-left:10px;gap:4px;border-radius:9px}
+ .avdb-tool .avdb-searchbar input{min-width:0;font-size:16px}
+ .avdb-tool .avdb-searchbar button{padding:10px 13px;min-height:44px}
+ .avdb-tool .avdb-resultbar{flex-wrap:wrap;gap:8px;margin:12px 0}
+ .avdb-tool .avdb-result-controls{margin-left:auto;gap:12px}
+ .avdb-tool .avdb-select-all,.avdb-tool .avdb-quick{min-height:36px;font-size:14px}
+ .avdb-tool .avdb-cover{border-radius:10px}
+ .avdb-tool .avdb-card{border-bottom:1px solid #dce5e3;padding-bottom:2px}
+ .avdb-tool .avdb-card-body{padding:10px 2px 12px}
+ .avdb-tool .avdb-card-actions{margin-top:10px;padding-top:10px}
+ .avdb-tool .avdb-card-actions button{min-height:42px;padding:8px 15px;font-size:15px}
+ .avdb-tool .avdb-pagination{gap:8px;flex-wrap:wrap;margin-top:16px}
+ .avdb-tool .avdb-pagination button{padding:8px 11px;min-height:42px}
+ .avdb-batchbar{box-sizing:border-box;max-width:100vw;gap:8px}
+ .avdb-batchbar strong{white-space:normal;min-width:0;font-size:14px}
+ .avdb-batchbar button{flex-shrink:0}
+}
