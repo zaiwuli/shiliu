@@ -10,7 +10,8 @@ export function PushToasts(){
   const timers=new Set<ReturnType<typeof setTimeout>>()
   const controllers=new Set<AbortController>()
   const later=(fn:()=>void,ms:number)=>{const timer=setTimeout(()=>{timers.delete(timer);if(!disposed)fn()},ms);timers.add(timer)}
-  const show=(notice:Notice)=>{setNotices(old=>[...old.filter(n=>n.id!==notice.id),notice].slice(-3));later(()=>setNotices(old=>old.filter(n=>n.id!==notice.id)),notice.kind==='error'?9000:5000)}
+  // Keep one push status visible at a time; terminal states replace the queued state.
+  const show=(notice:Notice)=>{setNotices([notice]);later(()=>setNotices(old=>old.filter(n=>n.id!==notice.id)),notice.kind==='error'?9000:5000)}
   const receive=(event:Event)=>{
    const {message,recordId}=(event as CustomEvent<{message:string;recordId?:number}>).detail
    const id=++serial
