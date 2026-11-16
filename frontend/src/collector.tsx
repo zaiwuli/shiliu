@@ -8,6 +8,7 @@ import { PushRecords } from './push-records'
 import { ImagePreview } from './image-preview'
 import './mobile.css'
 import { PushToasts } from './push-toast'
+import './theme.css'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -105,6 +106,16 @@ type Overview = {
   batches: { id: number; kind: string; status: string; message: string }[]
 }
 function App() {
+  const [theme,setTheme]=useState<'light'|'dark'|'system'>('system')
+  const [themeSaving,setThemeSaving]=useState(false)
+  const [dark,setDark]=useState(()=>window.matchMedia('(prefers-color-scheme: dark)').matches)
+  useEffect(()=>{let alive=true;api('/avdb/theme').then(r=>{if(alive&&['light','dark','system'].includes(r.theme))setTheme(r.theme)}).catch(()=>{});return()=>{alive=false}},[])
+  useEffect(()=>{
+    const media=window.matchMedia('(prefers-color-scheme: dark)')
+    const apply=()=>{const enabled=theme==='dark'||theme==='system'&&media.matches;setDark(enabled);document.documentElement.dataset.theme=enabled?'dark':'light';document.documentElement.style.colorScheme=enabled?'dark':'light';document.querySelector('meta[name="theme-color"]')?.setAttribute('content',enabled?'#141d21':'#f3f5f7')}
+    apply();media.addEventListener('change',apply);return()=>media.removeEventListener('change',apply)
+  },[theme])
+  const toggleTheme=async()=>{const next=dark?'light':'dark';setThemeSaving(true);try{await api('/avdb/theme',{theme:next});setTheme(next)}catch(e){setError((e as Error).message)}finally{setThemeSaving(false)}}
   const [mobileNavVisible, setMobileNavVisible] = useState(true)
   useEffect(() => {
     let previous = window.scrollY
@@ -354,7 +365,7 @@ function App() {
               }
             </p>
           </div>
-          <button onClick={() => page==='AVDB 搜索'?window.location.reload():action(refresh)}>刷新</button>
+          <button className="theme-toggle" disabled={themeSaving} onClick={()=>void toggleTheme()} aria-label={dark?'切换到日间模式':'切换到夜间模式'} title={dark?'切换到日间模式':'切换到夜间模式'}><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{dark?<><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/></>:<path d="M20.5 13a8.5 8.5 0 0 1-9.5-9.5A8.5 8.5 0 1 0 20.5 13Z"/>}</svg></button>
         </header>
         {page === 'AVDB 搜索' && <AvdbSearch />}
         {page === '采集任务' && (

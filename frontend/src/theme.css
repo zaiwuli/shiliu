@@ -1,0 +1,29 @@
+.shell>main>header .theme-toggle{display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:42px;height:42px;padding:9px;border-radius:50%}
+:root[data-theme=dark]{color-scheme:dark;--night-bg:#141d21;--night-panel:#1d292e;--night-border:#34474b;--night-text:#dce7e5;--night-muted:#9bb2ad}
+html[data-theme=dark] body{background:var(--night-bg);color:var(--night-text)}
+html[data-theme=dark] :is(.shell,.avdb-tool){color:var(--night-text)}
+html[data-theme=dark] .shell :is(main,header){background:transparent}
+html[data-theme=dark] :is(.shell,.avdb-tool,.push-toasts) :is(h1,h2,h3,strong,summary){color:var(--night-text)}
+html[data-theme=dark] :is(.shell,.avdb-tool,.push-toasts) :is(p,small,label,.avdb-meta,.avdb-result-count,.page-caption,.ledger-pagination,.ledger-detail-meta,.ledger-detail-note){color:var(--night-muted)}
+html[data-theme=dark] :is(.shell,.avdb-backdrop,.modal,.push-toasts) :is(button,input,select,textarea){background:#24343a;border-color:var(--night-border);color:var(--night-text)}
+html[data-theme=dark] :is(.shell,.avdb-backdrop,.modal) input[type=checkbox]{accent-color:#6fb8a2}
+html[data-theme=dark] .shell :is(.panel,.avdb-card,.avdb-searchbar,.avdb-table-wrap,.avdb-dialog,.ledger-grid-panel,.ledger-inline-detail,.ledger-detail-table,.avdb-batchbar,.modal>section,.modal>div){background:var(--night-panel);border-color:var(--night-border);color:var(--night-text)}
+html[data-theme=dark] :is(.shell,.avdb-backdrop) :is(th,td){border-color:var(--night-border);color:var(--night-text)}
+html[data-theme=dark] .shell :is(th,.ledger-row-open,.ledger-grid tbody>tr:hover,.avdb-table tr:hover){background:#28393e}
+html[data-theme=dark] .shell :is(.avdb-cover,.avdb-cover:disabled){background:#293a40;color:var(--night-muted)}
+html[data-theme=dark] .shell :is(.avdb-tags span,.ledger-state,.avdb-view,.subnav button.selected,.avdb-section-tabs button.active){background:#2c4544;border-color:#47635b;color:#b0d6c7}
+html[data-theme=dark] .shell :is(.primary,.active,button.selected,.avdb-view button.chosen){background:#32685e!important;border-color:#4c8a7b;color:#effaf5!important}
+html[data-theme=dark] .shell :is(a,.avdb-card-actions a,.ledger-detail-button){color:#9acdbb}
+html[data-theme=dark] .shell :is(.avdb-card-actions,.avdb-section-tabs,.ledger-tabs){border-color:var(--night-border)}
+html[data-theme=dark] .shell :is(.avdb-alert,[role=alert]){background:#422f2e;border-color:#735048;color:#efb9a7}
+html[data-theme=dark] .push-toast{background:#1d292ef5;border-color:var(--night-border);color:var(--night-text)}
+html[data-theme=dark] .push-toast.error{background:#392b29;color:#efb9a7}
+html[data-theme=dark] .shell aside{background:#17282c}
+html[data-theme=dark] .shell :is(.sync-card,.retry-inline-detail,.more-actions button,.status-tabs,.avdb-select,.avdb-empty,.avdb-download-note){background:var(--night-panel);border-color:var(--night-border);color:var(--night-muted)}
+html[data-theme=dark] .shell :is(.toolbar,.avdb-dialog-head,.ledger-intro){background:transparent}
+@media(max-width:767px){
+ html[data-theme=dark] .shell>aside nav{background:#1d292eed;border-color:var(--night-border)}
+ html[data-theme=dark] .shell>aside nav button{background:transparent;color:var(--night-muted)}
+ html[data-theme=dark] .shell>aside nav button .mobile-nav-icon{background:#2b4040;border-color:#3a5450}
+ html[data-theme=dark] .shell>aside nav button.active .mobile-nav-icon{background:#376557;border-color:#527e6d}
+}

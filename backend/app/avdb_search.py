@@ -130,6 +130,17 @@ class Search(BaseModel):
  page_size: int = Field(default=20, ge=1, le=100)
 
 HOME_PAGES=('文章管理','AVDB 搜索','采集任务','日志','设置')
+class ThemePreference(BaseModel):
+ theme:str
+@router.get('/theme')
+def get_theme():
+ return {'theme':(get_config('ui_theme') or {}).get('theme','system')}
+@router.post('/theme')
+def save_theme(body:ThemePreference):
+ if body.theme not in ('light','dark','system'):raise HTTPException(422,'未知主题')
+ set_config('ui_theme',{'theme':body.theme})
+ return get_theme()
+
 class Preferences(BaseModel):
  default_home:str
  only_if_absent:bool=False
