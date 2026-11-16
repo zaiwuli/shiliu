@@ -2,6 +2,9 @@ import { Fragment, useEffect, useState, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
 import './collector.css'
 import { Ledger } from './ledger'
+import { AvdbSearch } from './avdb-search'
+import { AvdbSettings } from './avdb-settings'
+import { PushRecords } from './push-records'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -101,7 +104,7 @@ type Overview = {
 function App() {
   const csvInput = useRef<HTMLInputElement>(null)
   const [taskTab, setTaskTab] = useState('采集配置')
-  const [settingsTab, setSettingsTab] = useState('网络')
+  const [settingsTab, setSettingsTab] = useState('连接与推送')
 
   const [retryLinks,setRetryLinks]=useState<{tid:number;detail_url:string;title:string|null;magnet:string[];edk:string[]}|null>(null)
   const [retryExpanded,setRetryExpanded]=useState<number|null>(null)
@@ -155,7 +158,9 @@ function App() {
     ).join('\n'))
   }
   const [editing, setEditing] = useState<number | null>(null)
-  const [page, setPage] = useState('文章管理'),
+  const [defaultHome,setDefaultHome]=useState(()=>{try{return localStorage.getItem('shiliu.defaultHome')||'文章管理'}catch{return '文章管理'}})
+  const [homeSaved,setHomeSaved]=useState(false)
+  const [page, setPage] = useState(()=>{const explicit=new URLSearchParams(window.location.search).get('page');const names:Record<string,string>={avdb:'AVDB 搜索',articles:'文章管理',tasks:'采集任务',logs:'日志',settings:'设置'};if(explicit&&names[explicit])return names[explicit];return ['文章管理','AVDB 搜索','采集任务','日志','设置'].includes(defaultHome)?defaultHome:'文章管理'}),
     [overview, setOverview] = useState<Overview>({
       total: 0,
       pending: 0,
@@ -210,6 +215,7 @@ function App() {
     } | null>(null)
   useEffect(()=>{if(page!=='采集任务'||taskTab!=='失败补抓')return;loadRetries().catch(e=>setError(e.message));const timer=setInterval(()=>loadRetries().catch(()=>{}),5000);return()=>clearInterval(timer)},[page,taskTab,retryStatus,retryPage])
   useEffect(()=>{if(page==='采集任务'&&taskTab==='失败补抓')api('/retries/settings').then(r=>setRetryAutoEnabled(r.auto_enabled)).catch(e=>setError(e.message))},[page,taskTab])
+  useEffect(()=>{if(page==='设置'&&settingsTab==='采集网络')api('/settings').then(setNetwork).catch(e=>setError(e.message))},[page,settingsTab])
   const filters = () => ({
     merge_status: statusFilter || null,
     section: section || null,
@@ -236,9 +242,11 @@ function App() {
     setSyncSettings(await api('/sync/settings'))
   }
   useEffect(() => {
+    if(page==='AVDB 搜索'||(page==='设置'&&new URLSearchParams(window.location.search).get('page')==='avdb'))return
     refresh().catch((e) => setError(e.message))
-  }, [num, section, statusFilter])
+  }, [num, section, statusFilter,page])
   useEffect(() => {
+    if(page==='AVDB 搜索'||(page==='设置'&&new URLSearchParams(window.location.search).get('page')==='avdb'))return
     const timer = setInterval(() => {
       api('/sync/status').then(setSyncProgress).catch(() => {})
       api('/overview')
@@ -246,14 +254,14 @@ function App() {
         .catch(() => {})
     }, 4000)
     return () => clearInterval(timer)
-  }, [])
+  }, [page])
   const action = async (fn: () => Promise<unknown>) => {
     setBusy(true)
     setError('')
     try {
       const result = await fn()
       if (result !== undefined) setOutput(JSON.stringify(result, null, 2))
-      await refresh()
+      if(!(page==='设置'&&new URLSearchParams(window.location.search).get('page')==='avdb'))await refresh()
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -283,7 +291,7 @@ function App() {
         <div className="brand"><span className="brand-icon"><img src="/shiliu-icon.png" alt="" /></span><span>拾流</span></div>
         <div className="brand-caption">采集 · 整理 · 同步</div>
         <nav>
-          {['文章管理', '采集任务', '日志', '设置'].map((p) => (
+          {['文章管理', 'AVDB 搜索', '采集任务', '日志', '设置'].map((p) => (
             <button
               className={page === p ? 'active' : ''}
               key={p}
@@ -307,6 +315,7 @@ function App() {
                 (
                   {
                     文章管理: '一处整理采集所得，让每条资源各归其位。',
+                    'AVDB 搜索': '组合关键词检索资源，一键交给 AVDB 下载。',
                     采集任务: '按计划巡访，循新帖而来。',
                     日志: '每一次采集，都有迹可循。',
                     设置: '调好连接与节奏，余下交给采集。',
@@ -315,8 +324,9 @@ function App() {
               }
             </p>
           </div>
-          <button onClick={() => action(refresh)}>刷新</button>
+          <button onClick={() => page==='AVDB 搜索'?window.location.reload():action(refresh)}>刷新</button>
         </header>
+        {page === 'AVDB 搜索' && <AvdbSearch />}
         {page === '采集任务' && (
           <div className="subnav">
             {['采集配置', '定时计划', '失败补抓'].map((t) => (
@@ -335,7 +345,7 @@ function App() {
         )}
         {page === '设置' && (
           <div className="subnav">
-            {['网络', '同步策略'].map((t) => (
+            {['连接与推送', '采集网络', '同步策略', '界面偏好'].map((t) => (
               <button
                 key={t}
                 className={settingsTab === t ? 'selected' : ''}
@@ -351,7 +361,7 @@ function App() {
         )}
         {page === '日志' && (
           <div className="subnav">
-            {['运行日志', '采集台账', '同步台账'].map((t) => (
+            {['运行日志', '采集台账', '同步台账', '推送记录'].map((t) => (
               <button
                 key={t}
                 className={logTab === t ? 'selected' : ''}
@@ -770,9 +780,10 @@ function App() {
             )}
           </>
         )}
-        {page === '设置' && settingsTab === '网络' && (
+        {page === '设置' && settingsTab === '连接与推送' && <AvdbSettings />}
+        {page === '设置' && settingsTab === '采集网络' && (
           <section className="panel">
-            <h2>运行设置</h2>
+            <h2>采集网络</h2>
             <p className="connection-status">
               数据库由部署环境配置 · 同步目标：Avdb article
             </p>{' '}
@@ -812,6 +823,7 @@ function App() {
             </button>
           </section>
         )}
+        {page === '设置' && settingsTab === '界面偏好' && <section className="panel avdb-settings"><h2>默认首页</h2><label>打开地址时进入<select value={defaultHome} onChange={e=>{setDefaultHome(e.target.value);setHomeSaved(false)}}>{['文章管理','AVDB 搜索','采集任务','日志','设置'].map(name=><option key={name}>{name}</option>)}</select></label><p>保存在当前浏览器。直接打开网站根地址时生效；地址中指定的页面优先。</p><button className="primary" onClick={()=>{try{localStorage.setItem('shiliu.defaultHome',defaultHome);setHomeSaved(true)}catch{setError('浏览器无法保存首页偏好')}}}>保存首页设置</button>{homeSaved&&<p role="status">默认首页已保存</p>}</section>}
         {page === '设置' && settingsTab === '同步策略' && (
           <section className="panel">
             <h2>同步策略</h2>
@@ -874,6 +886,7 @@ function App() {
             </button>
           </section>
         )}
+        {page === '日志' && logTab === '推送记录' && <PushRecords />}
         {page === '日志' && ['采集台账','同步台账'].includes(logTab) && <Ledger mode={logTab==='同步台账'?'sync':'crawl'} />}
         {page === '日志' && logTab === '运行日志' && (
           <section className="panel">

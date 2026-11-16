@@ -46,6 +46,8 @@ async def lifespan(app):
  schedule();scheduler.start();yield
  runtime.stop.set();scheduler.shutdown(wait=False)
 app=FastAPI(title='拾流',lifespan=lifespan)
+from app.avdb_search import router as avdb_router
+app.include_router(avdb_router)
 class RetrySettings(BaseModel):
  auto_enabled:bool
 @app.get('/api/retries/settings')

@@ -22,3 +22,6 @@ scripts/refactor_initial.py
 
 # One-off local refactoring helpers
 /scripts/
+
+# Local read-only debugging entry point (not part of deployment)
+/backend/app/search_server.py

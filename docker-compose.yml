@@ -8,4 +8,6 @@ services:
     environment:
       TZ: Asia/Shanghai
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to your Avdb database}
+      AVDB_URL: ${AVDB_URL:-}
+      AVDB_API_KEY: ${AVDB_API_KEY:-}
     restart: unless-stopped
