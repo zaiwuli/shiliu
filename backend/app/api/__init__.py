@@ -46,6 +46,20 @@ async def lifespan(app):
  schedule();scheduler.start();yield
  runtime.stop.set();scheduler.shutdown(wait=False)
 app=FastAPI(title='拾流',lifespan=lifespan)
+class RetrySettings(BaseModel):
+ auto_enabled:bool
+@app.get('/api/retries/settings')
+def retry_settings():
+ from app.collector.retry import settings
+ return settings()
+@app.post('/api/retries/settings')
+def save_retry_settings(body:RetrySettings):
+ with runtime.lock:
+  with session_scope() as db:
+   row=db.get(Config,'retry')
+   if row:row.content=body.model_dump()
+   else:db.add(Config(key='retry',content=body.model_dump()))
+ return body.model_dump()
 @app.get('/api/retries')
 def retries(status:str='waiting',page:int=1):
  with session_scope() as db:

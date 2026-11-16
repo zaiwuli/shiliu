@@ -3,9 +3,15 @@ from datetime import datetime,timedelta,timezone
 from sqlalchemy import func
 from sqlalchemy.dialects.postgresql import insert
 from app.core.database import session_scope
-from app.models import Retry,Article,Batch
+from app.models import Retry,Article,Batch,Config
 from app.collector import runtime
 from app.utils.log import logger
+
+def settings(db=None):
+ if db is None:
+  with session_scope() as session:return settings(session)
+ row=db.get(Config,'retry')
+ return {'auto_enabled':(row.content if row else {}).get('auto_enabled',True)}
 
 def register(website,section,tids,source_batch_id=None):
  with session_scope() as db:
@@ -16,6 +22,7 @@ def launch(ids=None):
  with runtime.lock:
   if runtime.active is not None:return False
   with session_scope() as db:
+   if ids is None and not settings(db)['auto_enabled']:return False
    query=db.query(Retry).filter(Retry.status.in_(['waiting','manual'])).order_by(Retry.id)
    if ids is not None:query=query.filter(Retry.id.in_(ids))
    else:
@@ -56,6 +63,7 @@ def run(bid,ids,manual,source_label):
   replay();sht.mode='direct'
   for rid in ids:
    runtime.check_stop()
+   if not manual and not settings()['auto_enabled']:break
    with session_scope() as db:
     r=db.get(Retry,rid);tid=r.tid;section=r.section;website=r.website;origin=r.source_batch_id
     exists=db.query(Article).filter_by(tid=tid,website=website).first() is not None

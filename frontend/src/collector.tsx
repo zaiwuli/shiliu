@@ -115,6 +115,12 @@ function App() {
     api(`/retries/${id}/links`).then(r=>{if(retryRequest.current===request)setRetryLinks(r)}).catch(e=>{if(retryRequest.current===request)setRetryDetailError(e.message)}).finally(()=>{if(retryRequest.current===request)setRetryDetailLoading(false)})
   }
   const [retryStatus,setRetryStatus]=useState('waiting')
+  const [retryAutoEnabled,setRetryAutoEnabled]=useState<boolean|null>(null)
+  const [retrySettingsSaving,setRetrySettingsSaving]=useState(false)
+  const saveRetryAuto=async(enabled:boolean)=>{
+    setRetrySettingsSaving(true)
+    try {const r=await api('/retries/settings',{auto_enabled:enabled});setRetryAutoEnabled(r.auto_enabled)}catch(e){setError((e as Error).message)}finally{setRetrySettingsSaving(false)}
+  }
   const [retryRows,setRetryRows]=useState<{id:number;tid:number;section:string;status:string;auto_attempts:number;manual_attempts:number;error:string;next_run:string|null}[]>([])
   const [retryTotal,setRetryTotal]=useState(0)
   const [retryPage,setRetryPage]=useState(1)
@@ -203,6 +209,7 @@ function App() {
       sections: string[]
     } | null>(null)
   useEffect(()=>{if(page!=='采集任务'||taskTab!=='失败补抓')return;loadRetries().catch(e=>setError(e.message));const timer=setInterval(()=>loadRetries().catch(()=>{}),5000);return()=>clearInterval(timer)},[page,taskTab,retryStatus,retryPage])
+  useEffect(()=>{if(page==='采集任务'&&taskTab==='失败补抓')api('/retries/settings').then(r=>setRetryAutoEnabled(r.auto_enabled)).catch(e=>setError(e.message))},[page,taskTab])
   const filters = () => ({
     merge_status: statusFilter || null,
     section: section || null,
@@ -590,7 +597,9 @@ function App() {
           </>
         )}
         {page==='采集任务'&&taskTab==='失败补抓'&&<section className="panel retry-panel">
-          <h2>失败补抓</h2><p>额外自动补抓最多三次，仍失败后转手动。数据库恢复不消耗补抓次数。</p>
+          <h2>失败补抓</h2>
+          <label><input type="checkbox" role="switch" checked={retryAutoEnabled===true} disabled={retryAutoEnabled===null||retrySettingsSaving} onChange={e=>saveRetryAuto(e.target.checked)}/>额外三次自动补抓{retrySettingsSaving?'（保存中…）':retryAutoEnabled===null?'（读取中…）':''}</label>
+          <p>默认开启，额外自动补抓最多三次，仍失败后转手动。关闭后暂停自动补抓，保留队列和次数，仍可手动补抓；重新开启后继续处理。正在抓取的单条帖子会完成。数据库恢复不消耗补抓次数。</p>
           <div className="status-tabs">{Object.entries({waiting:'自动等待',running:'补抓中',manual:'待手动补抓',recovered:'已恢复',ignored:'已忽略'}).map(([v,l])=><button key={v} className={retryStatus===v?'active':''} onClick={()=>{setRetryStatus(v);setRetryPage(1);setRetrySelected([]);setRetryAll(false)}}>{l}</button>)}</div>
           {retryStatus!=='running'&&<div className="toolbar"><label><input type="checkbox" checked={retryAll} onChange={e=>{setRetryAll(e.target.checked);setRetrySelected([])}}/>选择筛选全部（{retryTotal}）</label>
           {['waiting','manual'].includes(retryStatus)&&<button onClick={()=>retryAction('run')}>手动补抓</button>}
