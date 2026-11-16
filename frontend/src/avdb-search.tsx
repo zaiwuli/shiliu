@@ -15,7 +15,8 @@ export function AvdbSearch(){
  const [query,setQuery]=useState<({keyword:string}&Filter)|null>({keyword:'',website:'',section:'',category:''}),[loading,setLoading]=useState(false),[error,setError]=useState('')
  const [selected,setSelected]=useState<number[]>([]),[targets,setTargets]=useState<number[]>([]),[sending,setSending]=useState(false),[submitted,setSubmitted]=useState<number[]>([])
  const [preview,setPreview]=useState<number|null>(null),[filterOpen,setFilterOpen]=useState(false)
- const [quick,setQuick]=useState(false)
+ const quick=true
+ const setQuick=(_value:boolean)=>{}
  const sequence=useRef(0)
  const submitLock=useRef(false)
  useEffect(()=>{request('/filters').then(setFilters).catch(()=>{})},[])
@@ -25,7 +26,7 @@ export function AvdbSearch(){
  const toggle=(tid:number)=>setSelected(old=>old.includes(tid)?old.filter(n=>n!==tid):[...old,tid])
  const options=(key:keyof Filter)=>[...new Set(filters.filter(f=>(!scope.website||f.website===scope.website)&& (key!=='category'||!scope.section||f.section===scope.section)).map(f=>f[key]).filter(Boolean))]
  const filterControls=<>{(['website','section','category'] as const).map((key,i)=><label key={key}><select aria-label={['网站','板块','分类'][i]} value={scope[key]} onChange={e=>setScope(old=>({...old,[key]:e.target.value,...(key==='website'?{section:'',category:''}:key==='section'?{category:''}:{})}))}><option value="">全部{['网站','板块','分类'][i]}</option>{(key==='website'?[...new Set(filters.map(f=>f.website).filter(Boolean))]:options(key)).map(v=><option key={v}>{v}</option>)}</select></label>)}</>
- const send=async(ids=targets,defaults=false)=>{if(submitLock.current)return;submitLock.current=true;setSending(true);try{const result=await request('/download',{tids:ids,use_defaults:defaults});notifyPush(result.message,result.record_id);setSubmitted(old=>[...new Set([...old,...ids])]);setSelected([]);setTargets([])}catch(e){notifyPush((e as Error).message)}finally{submitLock.current=false;setSending(false)}}
+ const send=async(ids=targets,_defaults=true)=>{if(submitLock.current)return;submitLock.current=true;setSending(true);try{const result=await request('/download',{tids:ids,use_defaults:true});notifyPush(result.message,result.record_id);setSubmitted(old=>[...new Set([...old,...ids])]);setSelected([]);setTargets([])}catch(e){notifyPush((e as Error).message)}finally{submitLock.current=false;setSending(false)}}
  useEffect(()=>{document.querySelector('.avdb-section-tabs .active')?.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'})},[scope.section])
  const maxPage=Math.max(1,Math.ceil(total/20))
  return <div className="avdb-tool">

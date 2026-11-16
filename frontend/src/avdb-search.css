@@ -31,3 +31,5 @@
  .avdb-batchbar strong{white-space:normal;min-width:0;font-size:14px}
  .avdb-batchbar button{flex-shrink:0}
 }
+/* Quick push is always enabled; the legacy toggle remains hidden for compatibility. */
+.avdb-quick{display:none!important}
