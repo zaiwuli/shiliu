@@ -19,6 +19,19 @@ class TaskLog(Base):
 class Config(Base):
  __tablename__='shiliu_config'
  key=Column(String(100),primary_key=True);content=Column(JSON)
+class PushRecord(Base):
+ __tablename__='shiliu_push_record'
+ id=Column(BigInteger().with_variant(Integer,'sqlite'),primary_key=True)
+ created_at=Column(Text,nullable=False);finished_at=Column(Text)
+ tids=Column(JSON,nullable=False);mode=Column(Text,default='rules');downloader=Column(Text,default='');save_path=Column(Text,default='')
+ quick=Column(Boolean,default=False);status=Column(String(24),index=True);message=Column(Text)
+class RuntimeLog(Base):
+ __tablename__='shiliu_runtime_log'
+ id=Column(BigInteger().with_variant(Integer,'sqlite'),primary_key=True)
+ time=Column(Text,index=True);level=Column(String(24));icon=Column(String(16));message=Column(Text)
+class RecoveryRecord(Base):
+ __tablename__='shiliu_recovery'
+ id=Column(String(64),primary_key=True);kind=Column(String(24),nullable=False);payload=Column(JSON,nullable=False)
 class Target(Base):
  __tablename__='article'
  __table_args__={'info':{'external':True}}

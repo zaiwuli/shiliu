@@ -1,3 +1,4 @@
+import os
 from contextlib import contextmanager
 from typing import Generator
 
@@ -16,7 +17,7 @@ postgres_password = config_manager.get().POSTGRES_PASSWORD
 postgres_database = config_manager.get().POSTGRES_DB
 
 
-database_url = config_manager.get().DATABASE_URL or f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_database}"
+database_url = os.getenv("SHILIU_LOCAL_DATABASE_URL") or config_manager.get().DATABASE_URL or f"postgresql://{postgres_user}:{postgres_password}@{postgres_host}:{postgres_port}/{postgres_database}"
 engine = create_engine(database_url, pool_pre_ping=True, pool_recycle=1800)
 SessionLocal = sessionmaker(
     autocommit=False,
@@ -35,7 +36,7 @@ def session_scope() -> Generator:
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"数据库操作失败：{type(e).__name__}")
+        if isinstance(e,SQLAlchemyError):logger.error(f"数据库操作失败：{type(e).__name__}")
         raise
     finally:
         session.close()
@@ -48,7 +49,7 @@ def get_db():
         session.commit()
     except Exception as e:
         session.rollback()
-        logger.error(f"数据库操作失败：{type(e).__name__}")
+        if isinstance(e,SQLAlchemyError):logger.error(f"数据库操作失败：{type(e).__name__}")
         raise
     finally:
         session.close()

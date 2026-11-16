@@ -1,7 +1,7 @@
 """Search the external AVDB table and submit downloads through its API."""
-import os,json,csv,sqlite3,socket,ipaddress,threading
+import os,json,csv,socket,ipaddress,threading
 from datetime import datetime,timezone
-from fastapi import Query,Response
+from fastapi import Query,Response,BackgroundTasks
 from pathlib import Path
 from urllib.parse import urlparse
 from contextlib import contextmanager
@@ -10,7 +10,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import create_engine,text,Column,BigInteger,Text,Integer,Date
 from sqlalchemy.orm import Session,declarative_base
-from app.core.config import config_manager,data_path
+from app.core.config import config_manager
+from app.core.storage import get_config,set_config
+from app.core.database import session_scope as write_session
+from app.models import PushRecord
+from sqlalchemy import select,update,func
 
 Base=declarative_base()
 class Target(Base):
@@ -47,10 +51,9 @@ def links(value):
 
 router = APIRouter(prefix='/api/avdb')
 
-settings_file=Path(data_path)/'avdb-settings.json'
 def connection_settings():
  data={'url':os.getenv('AVDB_URL',''),'api_key':os.getenv('AVDB_API_KEY',''),'mode':'rules','downloader':'','save_path':'','username':'','password':''}
- if settings_file.exists():data.update(json.loads(settings_file.read_text(encoding='utf-8')))
+ data.update(get_config('avdb',{}))
  return data
 class ConnectionSettings(BaseModel):
  url:str
@@ -74,8 +77,7 @@ def save_settings(body:ConnectionSettings):
  if not data['api_key']:data['api_key']=old['api_key']
  if not data['password'] and data['url']==old['url'] and data['username']==old.get('username',''):data['password']=old.get('password','')
  if any(data.get(k)!=old.get(k) for k in ('url','username','password')):auth_session.clear()
- settings_file.parent.mkdir(parents=True,exist_ok=True)
- temporary=settings_file.with_suffix('.tmp');temporary.write_text(json.dumps(data,ensure_ascii=False),encoding='utf-8');temporary.replace(settings_file)
+ set_config('avdb',data)
  return {'ok':True}
 
 # Login credentials stay on the server; JWT and pending OTP are kept in memory only.
@@ -127,6 +129,25 @@ class Search(BaseModel):
  page: int = Field(default=1, ge=1)
  page_size: int = Field(default=20, ge=1, le=100)
 
+HOME_PAGES=('文章管理','AVDB 搜索','采集任务','日志','设置')
+class Preferences(BaseModel):
+ default_home:str
+ only_if_absent:bool=False
+@router.get('/preferences')
+def get_preferences():
+ stored=get_config('ui')
+ return {'default_home':(stored or {}).get('default_home','文章管理'),'configured':stored is not None}
+@router.post('/preferences')
+def save_preferences(body:Preferences):
+ if body.default_home not in HOME_PAGES:raise HTTPException(422,'未知首页')
+ with write_session() as db:
+  from app.models import Config
+  if db.bind.dialect.name=='postgresql':db.execute(text('SELECT pg_advisory_xact_lock(704936221)'))
+  row=db.get(Config,'ui')
+  if not row:db.add(Config(key='ui',content={'default_home':body.default_home}))
+  elif not body.only_if_absent:row.content={**row.content,'default_home':body.default_home}
+ return get_preferences()
+
 @router.get('/status')
 def status():
  with session_scope() as db:
@@ -134,9 +155,7 @@ def status():
  return {'configured': bool(os.getenv('AVDB_URL') and os.getenv('AVDB_API_KEY')),'database_connected':True,'database_readonly':readonly}
 
 def image_proxy_settings():
- local=Path(data_path)/'network-settings.json'
- if local.exists():return str(json.loads(local.read_text(encoding='utf-8')).get('PROXY') or '').strip()
- return str(config_manager.get().PROXY or '').strip()
+ return str((get_config('network',{}) or {}).get('PROXY') or config_manager.get().PROXY or '').strip()
 
 def public_image_url(url):
  parsed=urlparse(url)
@@ -235,45 +254,56 @@ def execute_download(body:Download,record_id):
  return {'message':'请求已提交至 AVDB，请在 AVDB 查看处理结果','result':result}
 
 
-log_file=Path(data_path)/'push-records.sqlite3'
-@contextmanager
-def log_db():
- log_file.parent.mkdir(parents=True,exist_ok=True)
- db=sqlite3.connect(log_file,timeout=10)
- db.row_factory=sqlite3.Row
- db.execute('CREATE TABLE IF NOT EXISTS push_records (id INTEGER PRIMARY KEY, created_at TEXT, finished_at TEXT, tids TEXT, mode TEXT, downloader TEXT, save_path TEXT, quick INTEGER, status TEXT, message TEXT)')
- try:
-  with db:yield db
- finally:db.close()
-
 def update_push(record_id,status,message):
- with log_db() as db:
-  db.execute('UPDATE push_records SET status=?,message=?,finished_at=? WHERE id=?',(status,message,datetime.now(timezone.utc).isoformat(),record_id))
+ with write_session() as db:
+  db.execute(update(PushRecord).where(PushRecord.id==record_id).values(status=status,message=message,finished_at=datetime.now(timezone.utc).isoformat()))
 
 @router.get('/push-records')
 def push_records(page:int=Query(default=1,ge=1),status:str='',page_size:int=Query(default=10,ge=1,le=20)):
- where=' WHERE status=?' if status else ''
- args=[status] if status else []
- with log_db() as db:
-  total=db.execute('SELECT count(*) FROM push_records'+where,args).fetchone()[0]
-  rows=db.execute('SELECT * FROM push_records'+where+' ORDER BY id DESC LIMIT ? OFFSET ?',args+[page_size,(page-1)*page_size]).fetchall()
- return {'total':total,'items':[{**dict(r),'tids':json.loads(r['tids'])} for r in rows]}
+ with write_session() as db:
+  q=db.query(PushRecord)
+  if status:q=q.filter(PushRecord.status==status)
+  total=q.count()
+  rows=q.order_by(PushRecord.id.desc()).offset((page-1)*page_size).limit(page_size).all()
+  return {'total':total,'items':[{c.name:getattr(row,c.name) for c in PushRecord.__table__.columns} for row in rows]}
 
-@router.post('/download')
-def download(body:Download):
+# Keep submission independent of the browser request. Never replay ambiguous downloads.
+push_workers=threading.Semaphore(2)
+
+def reconcile_push_records():
+ with write_session() as db:
+  db.execute(update(PushRecord).where(PushRecord.status.in_(['pending','sending'])).values(status='unknown',message='服务已重启，请先到 AVDB 核实任务后再重试',finished_at=datetime.now(timezone.utc).isoformat()))
+
+def process_download(body:Download,record_id:int):
+ with push_workers:
+  try:
+   result=execute_download(body,record_id)
+  except HTTPException as exc:
+   uncertain=exc.status_code==502 and ('未得到确认' in str(exc.detail) or '响应格式异常' in str(exc.detail) or 'HTTP 5' in str(exc.detail))
+   update_push(record_id,'unknown' if uncertain else 'failed',str(exc.detail))
+  except Exception:
+   update_push(record_id,'unknown','后台处理异常，请先到 AVDB 核实任务后再决定是否重试')
+  else:update_push(record_id,'submitted',result['message'])
+
+@router.get('/push-records/{record_id}')
+def push_record(record_id:int):
+ with write_session() as db:
+  row=db.get(PushRecord,record_id)
+  if not row:raise HTTPException(404,'推送记录不存在')
+  return {'id':row.id,'status':row.status,'message':row.message}
+
+@router.post('/download',status_code=202)
+def download(body:Download,background_tasks:BackgroundTasks):
  cfg=connection_settings()
- body.mode='rules';body.downloader='';body.save_path=''
- with log_db() as db:
-  cursor=db.execute('INSERT INTO push_records (created_at,tids,mode,downloader,save_path,quick,status,message) VALUES (?,?,?,?,?,?,?,?)',(datetime.now(timezone.utc).isoformat(),json.dumps(list(dict.fromkeys(body.tids))),body.mode,body.downloader if body.mode=='manual' else '',body.save_path if body.mode=='manual' else '',int(body.use_defaults),'pending','正在检查资源与配置'))
-  record_id=cursor.lastrowid
- try:
-  result=execute_download(body,record_id)
- except HTTPException as exc:
-  uncertain=exc.status_code==502 and ('未得到确认' in str(exc.detail) or '响应格式异常' in str(exc.detail) or 'HTTP 5' in str(exc.detail))
-  update_push(record_id,'unknown' if uncertain else 'failed',str(exc.detail))
-  raise
- except Exception:
-  update_push(record_id,'failed','推送处理异常，请检查本机服务与数据库连接')
-  raise
- update_push(record_id,'submitted',result['message'])
- return result
+ if not cfg.get('url') or not cfg.get('password'):raise HTTPException(422,'请先在连接与推送设置中保存 AVDB 地址和登录信息')
+ body=body.model_copy(update={'mode':'rules','downloader':'','save_path':'','tids':list(dict.fromkeys(body.tids))})
+ with write_session() as db:
+  # Serialize admission across workers before checking overlapping resources.
+  if db.bind.dialect.name=='postgresql':db.execute(text('SELECT pg_advisory_xact_lock(704936220)'))
+  active=db.query(PushRecord).filter(PushRecord.status.in_(['pending','sending'])).all()
+  if len(active)>=20:raise HTTPException(429,'推送队列已满，请稍后再试')
+  if any(set(row.tids).intersection(body.tids) for row in active):raise HTTPException(409,'所选资源正在推送，请到推送记录查看进度')
+  row=PushRecord(created_at=datetime.now(timezone.utc).isoformat(),tids=body.tids,mode='rules',downloader='',save_path='',quick=body.use_defaults,status='pending',message='已加入队列，等待后台提交至 AVDB')
+  db.add(row);db.flush();record_id=row.id
+ background_tasks.add_task(process_download,body,record_id)
+ return {'record_id':record_id,'status':'pending','message':'已加入推送队列'}

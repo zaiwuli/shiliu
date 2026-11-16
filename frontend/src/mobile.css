@@ -41,7 +41,7 @@
  .avdb-tool .avdb-card{border:1px solid #e0e8e3;background:#fff;border-radius:12px;overflow:hidden;padding:0;box-shadow:none}
  .avdb-tool .avdb-card.is-selected{border-color:#226b67;box-shadow:0 0 0 1px #226b67}
  .avdb-tool .avdb-cover{border-radius:0;aspect-ratio:16/9}
- .avdb-tool .avdb-cover:disabled{aspect-ratio:auto;height:56px;min-height:56px;opacity:1;background:#edf2ef;font-size:13px;color:#81978a}
+ .avdb-tool .avdb-cover:disabled{aspect-ratio:16/9;height:auto;min-height:0;opacity:1;background:#edf2ef;font-size:13px;color:#81978a}
  .avdb-tool .avdb-card-body{padding:12px 14px}
  .avdb-tool .avdb-static-title{font-size:16px;line-height:1.6;margin:9px 0}
  .avdb-tool .avdb-tags{gap:5px}

@@ -19,6 +19,8 @@ from app.scheduler.sht_sheduler import section_map
 scheduler=BackgroundScheduler()
 def schedule():
  scheduler.remove_all_jobs()
+ from app.core.storage import prune_runtime_logs
+ scheduler.add_job(prune_runtime_logs,'interval',hours=24,id='runtime-log-retention')
  from app.collector.retry import tick
  scheduler.add_job(tick,'interval',seconds=60,id='retry-worker',max_instances=1)
  cfg=sync.settings()
@@ -38,6 +40,9 @@ async def lifespan(app):
  if missing:raise RuntimeError('Avdb article 表缺少字段：'+', '.join(sorted(missing)))
  from app.core.schema import initialize_collector_tables
  initialize_collector_tables(engine,Base.metadata)
+ from app.core.storage import migrate_local_storage,prune_runtime_logs
+ from app.avdb_search import reconcile_push_records
+ migrate_local_storage();reconcile_push_records();prune_runtime_logs()
  with session_scope() as db:
   config=db.get(Config,'network')
   if config:config_manager.reload(config.content)

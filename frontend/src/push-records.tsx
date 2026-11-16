@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import './ledger.css'
 type RecordRow={id:number;created_at:string;finished_at:string|null;tids:number[];mode:string;downloader:string;save_path:string;quick:boolean;status:string;message:string}
-const names:Record<string,string>={pending:'检查中',sending:'提交中',submitted:'已提交',failed:'失败',unknown:'待确认'}
+const names:Record<string,string>={pending:'已排队',sending:'提交中',submitted:'已提交',failed:'失败',unknown:'待确认'}
 const format=(value:string|null)=>value?new Date(value).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—'
 export function PushRecords(){
  const [rows,setRows]=useState<RecordRow[]>([]),[total,setTotal]=useState(0),[page,setPage]=useState(1),[size,setSize]=useState(10),[status,setStatus]=useState(''),[error,setError]=useState(''),[refresh,setRefresh]=useState(0),[expanded,setExpanded]=useState<number|null>(null),[loading,setLoading]=useState(true)

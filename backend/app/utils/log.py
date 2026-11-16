@@ -1,29 +1,26 @@
 import logging
-import os
 import sys
-from collections import deque
-from threading import Lock
 
 from loguru import logger as uru_logger
-from app.core.config import data_path
-
-log_dir = os.path.join(data_path, 'logs')
-recent_logs = deque(maxlen=1000)
-recent_lock = Lock()
-
-
-def capture_console(message):
-    record = message.record
-    with recent_lock:
-        recent_logs.append({'time': record['time'].isoformat(),
-                            'level': record['level'].name,
-                            'icon': record['extra']['icon'],
-                            'message': record['extra']['summary']})
-
 
 def read_console_logs():
-    with recent_lock:
-        return list(recent_logs)
+    from app.core.database import session_scope
+    from app.models import RuntimeLog
+    with session_scope() as db:
+        rows=db.query(RuntimeLog).order_by(RuntimeLog.id.desc()).limit(1000).all()
+        return [{'time':r.time,'level':r.level,'icon':r.icon,'message':r.message} for r in reversed(rows)]
+
+def capture_database(message):
+    # Use the engine directly: session_scope logs its failures and would recurse.
+    try:
+        from app.core.database import engine
+        from app.models import RuntimeLog
+        from datetime import datetime,timezone
+        record=message.record
+        with engine.begin() as connection:
+            connection.execute(RuntimeLog.__table__.insert().values(time=datetime.now(timezone.utc).isoformat(),level=record['level'].name,icon=ICONS.get(record['level'].name,'ℹ️'),message=record['extra'].get('summary',record['message'])))
+    except Exception:
+        pass  # stdout still carries diagnostics when the database is unavailable.
 
 ICONS = {'DEBUG': '🔍', 'INFO': 'ℹ️', 'SUCCESS': '✅',
          'WARNING': '⚠️', 'ERROR': '❌', 'CRITICAL': '🚨'}
@@ -52,18 +49,11 @@ class InterceptHandler(logging.Handler):
 
 
 def setup_loguru_logger():
-    os.makedirs(log_dir, exist_ok=True)
+    if hasattr(sys.stdout,'reconfigure'):sys.stdout.reconfigure(errors='backslashreplace')
     uru_logger.remove()
-    uru_logger.add(
-        f'{log_dir}/app.log', rotation='00:00', retention='7 days',
-        compression='zip', encoding='utf-8', level='DEBUG',
-        backtrace=False, diagnose=False,
-        format='{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}', filter=batch_log_filter,
-    )
     uru_logger.add(sys.stdout, format=console_format, level='INFO',
                    colorize=False, backtrace=False, diagnose=False, filter=batch_log_filter)
-    uru_logger.add(capture_console, format=console_format, level='INFO',
-                   backtrace=False, diagnose=False, filter=batch_log_filter)
+    uru_logger.add(capture_database, format=console_format, level='INFO', enqueue=True, backtrace=False, diagnose=False, filter=batch_log_filter)
     logging.basicConfig(handlers=[InterceptHandler()], level=logging.INFO, force=True)
     for name in ('uvicorn', 'uvicorn.error', 'uvicorn.access', 'apscheduler'):
         log = logging.getLogger(name)

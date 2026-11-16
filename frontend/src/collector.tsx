@@ -7,6 +7,7 @@ import { AvdbSettings } from './avdb-settings'
 import { PushRecords } from './push-records'
 import { ImagePreview } from './image-preview'
 import './mobile.css'
+import { PushToasts } from './push-toast'
 async function api(path: string, body?: unknown, method?: string) {
   const r = await fetch('/api' + path, {
     method: method ?? (body === undefined ? 'GET' : 'POST'),
@@ -155,6 +156,7 @@ function App() {
     try {await api('/retries/action',{action,ids:retryAll?null:retrySelected,status:retryAll?retryStatus:null});setRetrySelected([]);await loadRetries()}catch(e){setError((e as Error).message)}
   }
   const [logTab, setLogTab] = useState('运行日志')
+  useEffect(()=>{const open=()=>{setPage('日志');setLogTab('推送记录');setMobileNavVisible(true)};window.addEventListener('shiliu:open-push-records',open);return()=>window.removeEventListener('shiliu:open-push-records',open)},[])
   const [statusFilter, setStatusFilter] = useState('')
   const [allFiltered, setAllFiltered] = useState(false)
   const [resolution, setResolution] = useState<{operation: string; filters: unknown; confirmation: string; items: {id: number; tid: number; title: string; size: number | null; target_tid: number; available: boolean; existing_title: string | null; existing_website: string | null}[]} | null>(null)
@@ -176,7 +178,13 @@ function App() {
     ).join('\n'))
   }
   const [editing, setEditing] = useState<number | null>(null)
-  const [defaultHome,setDefaultHome]=useState(()=>{try{return localStorage.getItem('shiliu.defaultHome')||'文章管理'}catch{return '文章管理'}})
+  const [defaultHome,setDefaultHome]=useState('文章管理')
+  const homeNavigationChanged=useRef(false)
+  useEffect(()=>{let alive=true;const load=async()=>{let saved=await api('/avdb/preferences');let legacy:string|null=null;try{legacy=localStorage.getItem('shiliu.defaultHome')}catch{}
+   if(!saved.configured&&legacy&&['文章管理','AVDB 搜索','采集任务','日志','设置'].includes(legacy))saved=await api('/avdb/preferences',{default_home:legacy,only_if_absent:true});
+   if(legacy){try{localStorage.removeItem('shiliu.defaultHome')}catch{}}
+   if(alive){setDefaultHome(saved.default_home);if(!new URLSearchParams(window.location.search).get('page')&&!homeNavigationChanged.current)setPage(saved.default_home)}
+  };load().catch(()=>{if(alive)setError('无法读取数据库中的首页设置')});return()=>{alive=false}},[])
   const [homeSaved,setHomeSaved]=useState(false)
   const [page, setPage] = useState(()=>{const explicit=new URLSearchParams(window.location.search).get('page');const names:Record<string,string>={avdb:'AVDB 搜索',articles:'文章管理',tasks:'采集任务',logs:'日志',settings:'设置'};if(explicit&&names[explicit])return names[explicit];return ['文章管理','AVDB 搜索','采集任务','日志','设置'].includes(defaultHome)?defaultHome:'文章管理'}),
     [overview, setOverview] = useState<Overview>({
@@ -306,6 +314,7 @@ function App() {
   })
   return (
     <div className="shell">
+      <PushToasts />
       <aside className={mobileNavVisible ? 'mobile-nav-visible' : 'mobile-nav-hidden'}>
         <div className="brand"><span className="brand-icon"><img src="/shiliu-icon.png" alt="" /></span><span>拾流</span></div>
         <div className="brand-caption">采集 · 整理 · 同步</div>
@@ -316,6 +325,7 @@ function App() {
               key={p}
               onClick={() => {
                 setMobileNavVisible(true)
+                homeNavigationChanged.current=true
                 setPage(p)
                 setOutput('')
                 setError('')
@@ -843,7 +853,7 @@ function App() {
             </button>
           </section>
         )}
-        {page === '设置' && settingsTab === '界面偏好' && <section className="panel avdb-settings"><h2>默认首页</h2><label>打开地址时进入<select value={defaultHome} onChange={e=>{setDefaultHome(e.target.value);setHomeSaved(false)}}>{['文章管理','AVDB 搜索','采集任务','日志','设置'].map(name=><option key={name}>{name}</option>)}</select></label><p>保存在当前浏览器。直接打开网站根地址时生效；地址中指定的页面优先。</p><button className="primary" onClick={()=>{try{localStorage.setItem('shiliu.defaultHome',defaultHome);setHomeSaved(true)}catch{setError('浏览器无法保存首页偏好')}}}>保存首页设置</button>{homeSaved&&<p role="status">默认首页已保存</p>}</section>}
+        {page === '设置' && settingsTab === '界面偏好' && <section className="panel avdb-settings"><h2>默认首页</h2><label>打开地址时进入<select value={defaultHome} onChange={e=>{setDefaultHome(e.target.value);setHomeSaved(false)}}>{['文章管理','AVDB 搜索','采集任务','日志','设置'].map(name=><option key={name}>{name}</option>)}</select></label><p>保存到拾流数据库，所有设备共用。地址中指定的页面优先。</p><button className="primary" onClick={()=>{api('/avdb/preferences',{default_home:defaultHome}).then(()=>setHomeSaved(true)).catch(e=>setError(e.message))}}>保存首页设置</button>{homeSaved&&<p role="status">默认首页已保存</p>}</section>}
         {page === '设置' && settingsTab === '同步策略' && (
           <section className="panel">
             <h2>同步策略</h2>
