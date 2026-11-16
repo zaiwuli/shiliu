@@ -219,7 +219,11 @@ def search(body:Search):
    if getattr(body,key):q=q.filter(getattr(Target,key)==getattr(body,key))
   total=q.count()
   rows=q.order_by(Target.publish_date.desc().nullslast(),Target.tid.desc()).offset((body.page-1)*body.page_size).limit(body.page_size).all()
-  return {'total':total,'items':[dict(tid=r.tid,title=r.title,website=r.website,section=r.section,category=r.category,size=r.size,publish_date=r.publish_date,preview_images=[f'/api/avdb/images/{r.tid}/{i}' for i in range(len(links(r.preview_images)))],detail_url=r.detail_url) for r in rows]}
+  pushed={tid:status for tid,status in db.query(PushRecord.tids,PushRecord.status).all() for tid in (tid if isinstance(tid,list) else [])}
+  def item(r):
+   status=pushed.get(r.tid)
+   return dict(tid=r.tid,title=r.title,website=r.website,section=r.section,category=r.category,size=r.size,publish_date=r.publish_date,preview_images=[f'/api/avdb/images/{r.tid}/{i}' for i in range(len(links(r.preview_images)))],detail_url=r.detail_url,push_status=status)
+  return {'total':total,'items':[item(r) for r in rows]}
 
 class Download(BaseModel):
  tids:list[int]=Field(min_length=1,max_length=100)
