@@ -33,4 +33,4 @@
 }
 /* Quick push is always enabled; the legacy toggle remains hidden for compatibility. */
 .avdb-quick{display:none!important}
-.avdb-load-more{display:block;margin:24px auto 0;min-width:140px}
+.avdb-load-more{display:block;margin:24px auto 0;min-width:140px;min-height:28px;text-align:center;color:#819187;font-size:14px}
