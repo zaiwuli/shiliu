@@ -2,6 +2,7 @@
 :root[data-theme=dark]{color-scheme:dark;--night-bg:#141d21;--night-panel:#1d292e;--night-border:#34474b;--night-text:#dce7e5;--night-muted:#9bb2ad}
 html[data-theme=dark] body{background:var(--night-bg);color:var(--night-text)}
 html[data-theme=dark] :is(.shell,.avdb-tool){color:var(--night-text)}
+html[data-theme=dark] .shell pre{background:var(--night-bg);color:var(--night-text)}
 html[data-theme=dark] .shell :is(main,header){background:transparent}
 html[data-theme=dark] :is(.shell,.avdb-tool,.push-toasts) :is(h1,h2,h3,strong,summary){color:var(--night-text)}
 html[data-theme=dark] :is(.shell,.avdb-tool,.push-toasts) :is(p,small,label,.avdb-meta,.avdb-result-count,.page-caption,.ledger-pagination,.ledger-detail-meta,.ledger-detail-note){color:var(--night-muted)}
